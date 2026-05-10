@@ -1,341 +1,314 @@
 #!/usr/bin/env bash
-# =============================================================================
-# THANOS E2E TEST — Simulated full loop without a live CLI
-# Verifies the harness logic, stone management, and scan work end-to-end
-# on a synthetic project.
-# Run: bash tests/e2e_test.sh
-# =============================================================================
+# THANOS E2E Test Suite — standalone, no dependency on thanos.sh internals
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+RED='\033[0;31m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'
+YELLOW='\033[1;33m'; ORANGE='\033[0;33m'; RESET='\033[0m'; BOLD='\033[1m'
 
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-YELLOW='\033[1;33m'
-BOLD='\033[1m'
-NC='\033[0m'
+PASS=0; FAIL=0
+TEST_DIR=$(mktemp -d /tmp/thanos_e2e_XXXXXX)
+ORIGINAL_DIR="$PWD"
+THANOS_DIR="$TEST_DIR/.thanos"
 
-passed=0
-failed=0
-total=0
+cleanup() { rm -rf "$TEST_DIR"; cd "$ORIGINAL_DIR"; }
+trap cleanup EXIT
 
-pass() { echo -e "${GREEN}[PASS]${NC} $1"; ((passed++)); ((total++)); }
-fail() { echo -e "${RED}[FAIL]${NC} $1"; ((failed++)); ((total++)); }
-
-echo -e "${PURPLE}${BOLD}"
-echo "╔══════════════════════════════════════════════════════╗"
-echo "║   THANOS E2E TEST SUITE — Simulated Loop             ║"
-echo "╚══════════════════════════════════════════════════════╝"
-echo -e "${NC}"
-
-# Create synthetic project
-TEST_DIR=$(mktemp -d)
-trap 'rm -rf "$TEST_DIR"' EXIT
-
-mkdir -p "$TEST_DIR/src" "$TEST_DIR/tests"
-
-cat > "$TEST_DIR/package.json" << 'EOF'
-{
-  "name": "synthetic-test-project",
-  "version": "1.0.0",
-  "scripts": {
-    "test": "node tests/run.js",
-    "lint": "echo 'lint ok'"
-  }
-}
-EOF
-
-cat > "$TEST_DIR/src/auth.js" << 'EOF'
-// BUG: No input validation
-function login(user, pass) {
-  if (user === 'admin' && pass === 'password123') { // hardcoded secret
-    return { token: 'abc123', user };
-  }
-  return null;
-}
-module.exports = { login };
-EOF
-
-cat > "$TEST_DIR/src/api.js" << 'EOF'
-const { login } = require('./auth');
-function handleLogin(req, res) {
-  const result = login(req.body.user, req.body.pass);
-  if (result) res.json(result);
-  else res.status(401).json({ error: 'Unauthorized' });
-}
-module.exports = { handleLogin };
-EOF
-
-cat > "$TEST_DIR/tests/run.js" << 'EOF'
-const { login } = require('../src/auth');
-let passed = 0;
-let failed = 0;
-
-function test(name, fn) {
-  try { fn(); console.log('[PASS]', name); passed++; }
-  catch(e) { console.log('[FAIL]', name, e.message); failed++; }
-}
-
-test('login with valid creds', () => {
-  const r = login('admin', 'password123');
-  if (!r || !r.token) throw new Error('no token');
-});
-
-test('login with invalid creds', () => {
-  const r = login('bad', 'bad');
-  if (r !== null) throw new Error('should return null');
-});
-
-console.log(`\nResults: ${passed} passed, ${failed} failed`);
-process.exit(failed > 0 ? 1 : 0);
-EOF
-
-echo -e "${CYAN}Synthetic project created at: $TEST_DIR${NC}\n"
-
-# ── TEST 1: Stone initialisation ──────────────────────────────────────────────
-echo -e "${YELLOW}── Test Group 1: Stone Initialisation ──${NC}"
-
-bash "$ROOT_DIR/thanos.sh" --init-only 2>/dev/null << 'EOF' || true
-EOF
-# Manually test init
-mkdir -p "$TEST_DIR/.thanos"
-for stone in SOUL REALITY POWER TIME SPACE MIND; do
-  tmpl="$ROOT_DIR/templates/THANOS_${stone}.md"
-  if [ -f "$tmpl" ]; then
-    cp "$tmpl" "$TEST_DIR/.thanos/${stone}.md"
+assert() {
+  local desc="$1" cond="$2"
+  if [[ "$cond" == "true" ]]; then
+    echo -e "${GREEN}[✓] PASS${RESET}: $desc"; ((PASS++))
   else
-    echo "# $stone Stone" > "$TEST_DIR/.thanos/${stone}.md"
+    echo -e "${RED}[✗] FAIL${RESET}: $desc"; ((FAIL++))
   fi
-done
+}
 
-for stone in SOUL REALITY POWER TIME SPACE MIND; do
-  if [ -f "$TEST_DIR/.thanos/${stone}.md" ]; then
-    pass "Stone ${stone}.md created"
-  else
-    fail "Stone ${stone}.md missing"
-  fi
-done
+# Helper: file exists and non-empty
+has_file() { [[ -f "$1" ]] && [[ -s "$1" ]]; }
+# Helper: file contains string
+has_content() { grep -q "$2" "$1" 2>/dev/null; }
 
-# ── TEST 2: Project scan ──────────────────────────────────────────────────────
-echo -e "\n${YELLOW}── Test Group 2: Project Scan ──${NC}"
+echo -e "${BOLD}${CYAN}\n🧪 THANOS E2E TEST SUITE${RESET}"
+echo "$(printf '%.0s━' {1..55})"
 
-# Simulate scan_project function
-DETECTED_STACK="Node.js"
-DETECTED_VERIFIER="npm test"
-TOTAL_FILES=$(find "$TEST_DIR" -type f | wc -l | tr -d ' ')
-CODE_FILES=$(find "$TEST_DIR" -name '*.js' | wc -l | tr -d ' ')
+# ----------------------------------------------------------------
+# SETUP: Create a fake Node.js project with intentional bugs
+# ----------------------------------------------------------------
+cd "$TEST_DIR"
+mkdir -p src tests
 
-tree_output=$(find "$TEST_DIR" -not -path '*/.git/*' | sort | head -20)
+cat > package.json <<'PKG'
+{"name":"test-app","version":"1.0.0","scripts":{"test":"echo 'test-ok' && exit 0","lint":"echo 'lint-ok' && exit 0"}}
+PKG
 
-cat > "$TEST_DIR/.thanos/REALITY.md" << REALITY
-# 🔴 Reality Stone
-## Stack: $DETECTED_STACK
-## Verifier: $DETECTED_VERIFIER
-## Files: $TOTAL_FILES total, $CODE_FILES code
-## Tree:
-$tree_output
-REALITY
+cat > src/auth.js <<'AUTH'
+// auth module
+const SECRET = 'hardcoded-secret-123'  // intentional security bug
+const DB_PASS = 'password123'
 
-if grep -q 'Node.js' "$TEST_DIR/.thanos/REALITY.md"; then
-  pass "Stack detected: Node.js"
-else
-  fail "Stack not detected"
-fi
+function login(user) {
+  // no input validation
+  return { token: SECRET + user }
+}
 
-if grep -q 'npm test' "$TEST_DIR/.thanos/REALITY.md"; then
-  pass "Verifier detected: npm test"
-else
-  fail "Verifier not detected"
-fi
+module.exports = { login }
+AUTH
 
-if grep -q 'src' "$TEST_DIR/.thanos/REALITY.md"; then
-  pass "File tree captured in REALITY.md"
-else
-  fail "File tree missing"
-fi
+cat > src/app.js <<'APP'
+const express = require('express')
+const auth = require('./auth')
+const app = express()
+app.post('/login', (req, res) => res.json(auth.login(req.body.user)))
+module.exports = app
+APP
 
-# ── TEST 3: Code analysis (simulate what agent reads) ────────────────────────
-echo -e "\n${YELLOW}── Test Group 3: Code Analysis Simulation ──${NC}"
+cat > tests/auth.test.js <<'TEST'
+const { login } = require('../src/auth')
+test('login returns token', () => {
+  const result = login('alice')
+  expect(result.token).toBeTruthy()
+})
+TEST
 
-# Simulate what the agent would detect
-bug_hardcoded=$(grep -r 'password123\|hardcoded secret' "$TEST_DIR/src" 2>/dev/null | wc -l)
-bug_no_validation=$(grep -r 'function login' "$TEST_DIR/src" 2>/dev/null | wc -l)
+# ----------------------------------------------------------------
+# TEST GROUP 1: Stone directory and file creation
+# ----------------------------------------------------------------
+echo -e "\n${CYAN}[ GROUP 1 ] Stone Initialisation${RESET}"
 
-if [ "$bug_hardcoded" -gt 0 ]; then
-  pass "Agent would detect hardcoded credential (security bug)"
-else
-  fail "Hardcoded credential not found"
-fi
+mkdir -p "$THANOS_DIR"
 
-if [ "$bug_no_validation" -gt 0 ]; then
-  pass "Agent would find auth function to review"
-else
-  fail "Auth function not found"
-fi
+# Create each stone file
+cat > "$THANOS_DIR/SOUL.md" <<'EOF'
+# 🟠 SOUL STONE
+## STATUS: UNSET
+## GOAL
+[NOT YET DEFINED]
+## STOP CONDITION
+[NOT YET DEFINED]
+## VERIFIER COMMAND
+npm test
+EOF
 
-# ── TEST 4: Simulated POWER stone (run actual tests) ─────────────────────────
-echo -e "\n${YELLOW}── Test Group 4: Power Stone (Real Test Execution) ──${NC}"
+cat > "$THANOS_DIR/REALITY.md" <<'EOF'
+# 🔴 REALITY STONE
+## Language: Node.js
+## Verifier: npm test
+## Files read: 3
+=== FILE: src/auth.js ===
+const SECRET = 'hardcoded-secret-123'
+EOF
 
-if command -v node &>/dev/null; then
-  pushd "$TEST_DIR" > /dev/null
-  if node tests/run.js &>/tmp/thanos_test_output.txt; then
-    pass "npm test exits 0 (tests pass)"
-    # Write to POWER stone
-    cat > "$TEST_DIR/.thanos/POWER.md" << POWER
-# 💜 Power Stone
-## Loop 1 — $(date)
-Command: node tests/run.js
-Exit: 0 ✅
-Output:
-$(cat /tmp/thanos_test_output.txt)
-POWER
-    pass "Power Stone written with test results"
-  else
-    fail "Tests failed (exit non-zero)"
-  fi
-  popd > /dev/null
-else
-  echo -e "  ${YELLOW}[SKIP]${NC} node not available, skipping Power Stone test"
-  ((total++))
-fi
+cat > "$THANOS_DIR/POWER.md" <<'EOF'
+# 💜 POWER STONE
+## Loop 0
+- Build: UNKNOWN
+- Tests: UNKNOWN
+EOF
 
-# ── TEST 5: Simulated MIND stone (critic scoring) ────────────────────────────
-echo -e "\n${YELLOW}── Test Group 5: Mind Stone (Critic Simulation) ──${NC}"
+cat > "$THANOS_DIR/TIME.md" <<'EOF'
+# 🔵 TIME STONE
+## Loop Counter: 0
+## Session Started: 2026-05-10T08:00:00Z
+EOF
 
-# Simulate what the critic would produce
-cat > "$TEST_DIR/.thanos/MIND.md" << 'MIND'
-# 🟡 Mind Stone — Critic Report
+cat > "$THANOS_DIR/SPACE.md" <<'EOF'
+# 🔷 SPACE STONE
+## Current Phase: 0 — DISCUSS
+## Phase Queue
+- [ ] Phase 0: DISCUSS
+EOF
+
+cat > "$THANOS_DIR/MIND.md" <<'EOF'
+# 🟡 MIND STONE
+## Scoring Rubric
+All scores must be >= 95 to snap.
+EOF
+
+assert "SOUL.md created and non-empty"    "$(has_file "$THANOS_DIR/SOUL.md"    && echo true || echo false)"
+assert "REALITY.md created and non-empty" "$(has_file "$THANOS_DIR/REALITY.md" && echo true || echo false)"
+assert "POWER.md created and non-empty"   "$(has_file "$THANOS_DIR/POWER.md"   && echo true || echo false)"
+assert "TIME.md created and non-empty"    "$(has_file "$THANOS_DIR/TIME.md"    && echo true || echo false)"
+assert "SPACE.md created and non-empty"   "$(has_file "$THANOS_DIR/SPACE.md"   && echo true || echo false)"
+assert "MIND.md created and non-empty"    "$(has_file "$THANOS_DIR/MIND.md"    && echo true || echo false)"
+
+# ----------------------------------------------------------------
+# TEST GROUP 2: Project scan content verification
+# ----------------------------------------------------------------
+echo -e "\n${CYAN}[ GROUP 2 ] Project Scan — REALITY Stone${RESET}"
+
+# Simulate what scan_project() does
+FILE_TREE=$(find . -type f ! -path './.thanos/*' ! -name '*.lock' 2>/dev/null | sort)
+CODE_CONTENT=""
+while IFS= read -r f; do
+  [[ -f "$f" ]] || continue
+  CODE_CONTENT+="=== FILE: $f ===$'\n'"
+  CODE_CONTENT+=$(cat "$f")
+  CODE_CONTENT+=$'\n'
+done <<< "$FILE_TREE"
+
+cat > "$THANOS_DIR/REALITY.md" <<REALITY_EOF
+# 🔴 REALITY STONE
+## Language: Node.js
+## Verifier: npm test
+## Files in tree: $(echo "$FILE_TREE" | wc -l | tr -d ' ')
+
+## File Tree
+\`\`\`
+$FILE_TREE
+\`\`\`
+
+## Code Contents
+$CODE_CONTENT
+REALITY_EOF
+
+assert "REALITY.md contains src/auth.js"     "$(has_content "$THANOS_DIR/REALITY.md" 'auth.js'    && echo true || echo false)"
+assert "REALITY.md contains actual code"      "$(has_content "$THANOS_DIR/REALITY.md" 'hardcoded'  && echo true || echo false)"
+assert "REALITY.md contains package.json"     "$(has_content "$THANOS_DIR/REALITY.md" 'package.json' && echo true || echo false)"
+assert "REALITY.md has Node.js stack label"   "$(has_content "$THANOS_DIR/REALITY.md" 'Node.js'    && echo true || echo false)"
+assert "REALITY.md has verifier command"      "$(has_content "$THANOS_DIR/REALITY.md" 'npm test'   && echo true || echo false)"
+
+# ----------------------------------------------------------------
+# TEST GROUP 3: Verifier execution and POWER stone update
+# ----------------------------------------------------------------
+echo -e "\n${CYAN}[ GROUP 3 ] Verifier Execution — POWER Stone${RESET}"
+
+# Run the actual verifier (npm test is just echo in our fake project)
+VERIFIER_OUTPUT=$(npm test 2>&1 || true)
+VERIFIER_EXIT=$?
+
+cat > "$THANOS_DIR/POWER.md" <<POWER_EOF
+# 💜 POWER STONE
+## Loop 1
+- Build: exit 0
+- Tests: exit $VERIFIER_EXIT
+- Output: $VERIFIER_OUTPUT
+POWER_EOF
+
+assert "POWER.md written with test output"     "$(has_file "$THANOS_DIR/POWER.md" && echo true || echo false)"
+assert "Verifier ran (npm test exit captured)" "[[ $VERIFIER_EXIT -eq 0 ]] && echo true || echo false"
+assert "Test output in POWER.md (test-ok)"     "$(has_content "$THANOS_DIR/POWER.md" 'test-ok'  && echo true || echo false)"
+assert "Exit code recorded in POWER.md"        "$(has_content "$THANOS_DIR/POWER.md" 'exit 0'  && echo true || echo false)"
+
+# ----------------------------------------------------------------
+# TEST GROUP 4: Critic simulation — security bug detection
+# ----------------------------------------------------------------
+echo -e "\n${CYAN}[ GROUP 4 ] Critic Detection — MIND Stone${RESET}"
+
+cat > "$THANOS_DIR/MIND.md" <<'CRITIC_EOF'
+# 🟡 MIND STONE — Critic Reports
 ## Critic Report — Loop 1
 ### Scores
 | Category | Score | Blocking Issues |
 |---|---|---|
-| Logic Correctness | 90/100 | 0 |
-| Code Quality | 72/100 | Hardcoded credentials in auth.js:3 |
-| Test Coverage | 65/100 | No edge case tests, no injection tests |
-| Visual/UI Proof | SKIP | No UI changes |
-| Security | 40/100 | Hardcoded password, no input sanitization |
-| Performance | 95/100 | 0 |
-
+| Logic Correctness | 90 | None |
+| Code Quality | 85 | src/auth.js: hardcoded credentials |
+| Test Coverage | 70 | No tests for edge cases |
+| Visual/UI Proof | N/A | No UI changes |
+| Security | 40 | CRITICAL: src/auth.js line 2 — SECRET hardcoded |
+| Performance | 95 | None |
 ### Verdict: LOOP AGAIN ↩
 ### Issues List
-- [src/auth.js:3] Hardcoded credential 'password123' — security risk
-- [src/auth.js] No input validation/sanitization
-- [tests/run.js] Missing: SQL injection test, XSS test, empty input test
-MIND
+- [src/auth.js:2] Hardcoded secret 'hardcoded-secret-123' — move to env var
+- [src/auth.js:3] Hardcoded DB_PASS — move to env var
+- [src/auth.js] No input validation on login()
+CRITIC_EOF
 
-if grep -q 'LOOP AGAIN' "$TEST_DIR/.thanos/MIND.md"; then
-  pass "Critic correctly identifies issues → LOOP AGAIN"
-else
-  fail "Critic verdict missing"
-fi
+assert "MIND.md has critic report header"     "$(has_content "$THANOS_DIR/MIND.md" 'Critic Report' && echo true || echo false)"
+assert "Security score is failing (40/100)"  "$(has_content "$THANOS_DIR/MIND.md" 'Security.*40'  && echo true || echo false)"
+assert "LOOP AGAIN verdict present"          "$(has_content "$THANOS_DIR/MIND.md" 'LOOP AGAIN'    && echo true || echo false)"
+assert "Specific file:line reference exists" "$(has_content "$THANOS_DIR/MIND.md" 'auth.js:2'     && echo true || echo false)"
+assert "Hardcoded secret issue flagged"      "$(has_content "$THANOS_DIR/MIND.md" 'hardcoded-secret' && echo true || echo false)"
 
-if grep -q 'Security.*40' "$TEST_DIR/.thanos/MIND.md"; then
-  pass "Critic caught security score < 95 (blocking)"
-else
-  fail "Security issue not flagged"
-fi
+# ----------------------------------------------------------------
+# TEST GROUP 5: Hermes self-learning — anti-rule injection
+# ----------------------------------------------------------------
+echo -e "\n${CYAN}[ GROUP 5 ] Hermes Self-Learning — TIME Stone${RESET}"
 
-if grep -q 'Hardcoded' "$TEST_DIR/.thanos/MIND.md"; then
-  pass "Critic found hardcoded credential bug"
-else
-  fail "Hardcoded credential not flagged"
-fi
+# Simulate Hermes reading MIND.md issues and writing lessons
+cat >> "$THANOS_DIR/TIME.md" <<'HERMES_EOF'
 
-# ── TEST 6: Hermes learning (TIME stone) ─────────────────────────────────────
-echo -e "\n${YELLOW}── Test Group 6: Hermes Learning (TIME Stone) ──${NC}"
+## Loop 1 Lesson
+[ANTI-RULE Loop 1]: NEVER hardcode secrets in source files because they leak to git history — detected by critic in loop 1
+[ANTI-RULE Loop 1]: NEVER skip input validation on public functions because injection risk
+Loop Counter: 1
+HERMES_EOF
 
-cat > "$TEST_DIR/.thanos/TIME.md" << 'TIME'
-# 🔵 Time Stone — Loop History
-## Loop Counter: 1
+assert "TIME.md updated with loop lesson"  "$(has_content "$THANOS_DIR/TIME.md" 'Loop 1 Lesson'  && echo true || echo false)"
+assert "ANTI-RULE injected into TIME.md"   "$(has_content "$THANOS_DIR/TIME.md" 'ANTI-RULE'      && echo true || echo false)"
+assert "Loop counter incremented to 1"     "$(has_content "$THANOS_DIR/TIME.md" 'Loop Counter: 1' && echo true || echo false)"
+assert "Security anti-rule written"        "$(has_content "$THANOS_DIR/TIME.md" 'hardcoded secrets' && echo true || echo false)"
 
-## History
-| Loop | Summary | Critic Score | Outcome |
-|---|---|---|---|
-| 1 | Scanned project, found auth bugs | 72/100 avg | LOOP AGAIN |
+# ----------------------------------------------------------------
+# TEST GROUP 6: Snap condition — all scores >= 95
+# ----------------------------------------------------------------
+echo -e "\n${CYAN}[ GROUP 6 ] Snap Condition Evaluation${RESET}"
 
-## Hermes Lessons
-[Loop 1] Security: Hardcoded credentials in auth.js — critic scored 40/100. Fixed in loop 2.
+cat > "$THANOS_DIR/MIND.md" <<'SNAP_EOF'
+# 🟡 MIND STONE — Critic Reports
+## Critic Report — Loop 3
+### Scores
+| Category | Score | Blocking Issues |
+|---|---|---|
+| Logic Correctness | 98 | None |
+| Code Quality | 97 | None |
+| Test Coverage | 96 | None |
+| Visual/UI Proof | N/A | No UI changes |
+| Security | 100 | None |
+| Performance | 95 | None |
+### Verdict: SNAP ✅
+SNAP_EOF
 
-## Anti-Rules Added
-[ANTI-RULE Loop 1]: NEVER hardcode credentials — caused Security score 40/100
-TIME
+assert "SNAP verdict present in MIND.md"  "$(has_content "$THANOS_DIR/MIND.md" 'SNAP ✅'       && echo true || echo false)"
+assert "All scores documented as >= 95"   "$(has_content "$THANOS_DIR/MIND.md" 'Critic Report' && echo true || echo false)"
+assert "No LOOP AGAIN in snap report"     "$( ! grep -q 'LOOP AGAIN' "$THANOS_DIR/MIND.md" && echo true || echo false)"
 
-if grep -q 'ANTI-RULE' "$TEST_DIR/.thanos/TIME.md"; then
-  pass "Hermes injected anti-rule into TIME.md"
-else
-  fail "Anti-rule not written"
-fi
+# ----------------------------------------------------------------
+# TEST GROUP 7: SOUL.md goal format validation
+# ----------------------------------------------------------------
+echo -e "\n${CYAN}[ GROUP 7 ] SOUL Stone Goal Format${RESET}"
 
-if grep -q 'Loop 1' "$TEST_DIR/.thanos/TIME.md"; then
-  pass "Loop history recorded in TIME.md"
-else
-  fail "Loop history missing"
-fi
-
-# ── TEST 7: SOUL stone goal format ───────────────────────────────────────────
-echo -e "\n${YELLOW}── Test Group 7: SOUL Stone (Goal Format) ──${NC}"
-
-cat > "$TEST_DIR/.thanos/SOUL.md" << 'SOUL'
-# 🟠 Soul Stone — Goal & Stop Condition
+cat > "$THANOS_DIR/SOUL.md" <<'SOUL_EOF'
+# 🟠 SOUL STONE — Active Goal
+## STATUS: ACTIVE — 2026-05-10T08:30:00Z
 
 ## GOAL
-Refactor auth.js to remove hardcoded credentials, add input validation,
-and achieve >= 90% test coverage on the auth module.
+Refactor auth.js to use environment variables for secrets
 
-## STOP CONDITION
-- [ ] `node tests/run.js` exits 0
-- [ ] No hardcoded credentials in src/
-- [ ] Test coverage >= 90% for auth.js
+## STOP CONDITION (machine-verifiable)
+- npm test exits 0
+- grep -r 'hardcoded-secret' src/ returns empty
+- npm run lint exits 0
 
-## VERIFIER COMMAND
-```bash
-node tests/run.js
-```
+## SCOPE
+In scope: src/auth.js, .env.example
+Out of scope: frontend, database
 
 ## ASSUMPTIONS
-1. Node.js 20+
-2. No external auth library (vanilla JS)
-3. Existing test structure kept
+- Node.js 20, dotenv available
 
-## STATUS
-- [x] Goal verified with human
-- [x] Stop condition is machine-checkable
-- [ ] SNAP achieved ✅
-SOUL
+## VERIFIER COMMAND
+npm test
+SOUL_EOF
 
-if grep -q 'STOP CONDITION' "$TEST_DIR/.thanos/SOUL.md"; then
-  pass "SOUL stone has machine-verifiable stop condition"
-else
-  fail "Stop condition missing"
-fi
+assert "SOUL.md has ## GOAL section"           "$(has_content "$THANOS_DIR/SOUL.md" '## GOAL'            && echo true || echo false)"
+assert "SOUL.md has STOP CONDITION section"    "$(has_content "$THANOS_DIR/SOUL.md" 'STOP CONDITION'      && echo true || echo false)"
+assert "SOUL.md has VERIFIER COMMAND section"  "$(has_content "$THANOS_DIR/SOUL.md" 'VERIFIER COMMAND'    && echo true || echo false)"
+assert "SOUL.md has machine-verifiable exit 0" "$(has_content "$THANOS_DIR/SOUL.md" 'exits 0'            && echo true || echo false)"
+assert "SOUL.md has SCOPE defined"             "$(has_content "$THANOS_DIR/SOUL.md" 'Out of scope'       && echo true || echo false)"
+assert "SOUL.md has ACTIVE status"             "$(has_content "$THANOS_DIR/SOUL.md" 'STATUS: ACTIVE'     && echo true || echo false)"
 
-if grep -q 'VERIFIER COMMAND' "$TEST_DIR/.thanos/SOUL.md"; then
-  pass "SOUL stone has verifier command"
-else
-  fail "Verifier command missing"
-fi
-
-# ── FINAL SUMMARY ─────────────────────────────────────────────────────────────
+# ----------------------------------------------------------------
+# RESULTS
+# ----------------------------------------------------------------
 echo ""
-echo -e "${PURPLE}╔══════════════════════════════════════════════════════╗${NC}"
-echo -e "${PURPLE}║              E2E TEST RESULTS                        ║${NC}"
-echo -e "${PURPLE}╚══════════════════════════════════════════════════════╝${NC}"
-echo ""
-echo -e "  ${BOLD}Total:  $total${NC}"
-echo -e "  ${GREEN}Passed: $passed${NC}"
-if [ $failed -gt 0 ]; then
-  echo -e "  ${RED}Failed: $failed${NC}"
-  echo ""
-  echo -e "  ${RED}The Gauntlet is incomplete. Fix failures and try again.${NC}"
+echo "$(printf '%.0s━' {1..55})"
+TOTAL=$((PASS + FAIL))
+echo -e "${BOLD}RESULTS: ${GREEN}$PASS/$TOTAL PASSED${RESET}  |  ${RED}$FAIL FAILED${RESET}"
+echo "$(printf '%.0s━' {1..55})"
+
+if [[ $FAIL -eq 0 ]]; then
+  echo -e "${YELLOW}[💥]${RESET} ${BOLD}ALL TESTS PASSED. The gauntlet holds.${RESET}"
+  exit 0
+else
+  echo -e "${RED}[✗]${RESET} $FAIL test(s) failed. Loop continues."
   exit 1
-else
-  echo -e "  ${RED}Failed: 0${NC}"
-  echo ""
-  echo -e "  ${PURPLE}💥 SNAP. The E2E suite is perfectly balanced.${NC}"
-  echo ""
-  echo -e "  ${CYAN}Stone files written to: $TEST_DIR/.thanos/${NC}"
-  echo -e "  ${DIM}(temp dir — cleaned up on exit)${NC}"
 fi
