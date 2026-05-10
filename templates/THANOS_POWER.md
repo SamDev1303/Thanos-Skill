@@ -1,14 +1,20 @@
-# THANOS_POWER.md — Decisions and Advice
-> 🟣 Power Stone — questions, decisions, sub-model advice, blockers.
+# 💜 Power Stone — Proof of Work
 
-## Open questions
-- [Question] → [Answer / Pending]
+## VERIFIER RESULTS
 
-## Decisions made
-- [Decision] — [Why this approach was chosen]
+| Loop | Command | Exit Code | Notes |
+|------|---------|-----------|-------|
+| 0    | -       | -         | initialized |
 
-## Sub-model advice
-- [Question asked] → [Answer received]
+## CURRENT STATUS
+- Build: ⚪ Not run
+- Tests: ⚪ Not run  
+- Lint: ⚪ Not run
+- Coverage: ⚪ Not measured
 
-## Blockers
-- [Blocker description] → [Status: resolved / active]
+## POWER STONE RULE
+All four must show ✅ green before critic is invoked.
+Red = sub agent goes back to fix. No exceptions.
+
+## RAW OUTPUT LOG
+<!-- Append verifier output here each loop -->

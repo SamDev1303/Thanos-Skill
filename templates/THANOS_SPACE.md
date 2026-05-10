@@ -1,18 +1,22 @@
-# THANOS_SPACE.md — Codebase Map
-> 🔵 Space Stone — written by the agent on first run, updated when structure changes.
+# 🔷 Space Stone — Phase Queue & Task Backlog
 
-## What this project does
-[Plain English. One paragraph.]
+## CURRENT PHASE
+Phase 0: DISCUSS
 
-## Key folders
-- `src/` — [what lives here]
-- `tests/` — [what lives here]
+## PHASE QUEUE
+- [ ] Phase 0: DISCUSS — Deep Q&A goal clarification
+- [ ] Phase 1: ASSUMPTIONS — List all assumptions  
+- [ ] Phase 2: PLAN — Write acceptance criteria
+- [ ] Phase 3: EXECUTE — Sub agent builds
+- [ ] Phase 4: VERIFY — Power stone check
+- [ ] Phase 5: CRITIQUE — Critic agent scores
+- [ ] Phase 6: SNAP or LOOP — Main agent decides
 
-## Important files
-- `[file]` — [what it does]
+## TASK BACKLOG
+<!-- Active tasks for this loop -->
 
-## Tech stack
-[Languages, frameworks, test runner, build tool]
+## BLOCKERS
+<!-- What is preventing progress -->
 
-## Last updated
-[Pass number or date]
+## NEXT ACTION
+<!-- Single next action for sub agent -->

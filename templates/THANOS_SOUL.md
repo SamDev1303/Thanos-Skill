@@ -1,13 +1,38 @@
-# THANOS_SOUL.md — The Goal
-> 🟠 Soul Stone — one goal, one stop condition.
+# 🟠 Soul Stone — Goal & Stop Condition
 
-## Goal
-[One sentence. What must be done.]
+## GOAL
+<!-- Write the real goal here. Be specific. Vague goals cause infinite loops. -->
 
-## Stop condition
-- [ ] [Verifiable check 1]
-- [ ] [Verifiable check 2]
-- [ ] [Verifiable check 3]
 
-## Proof command
-`[command that exits 0 when done — e.g. npm test && npm run build]`
+## STOP CONDITION (machine-verifiable)
+<!-- Every item here must be checkable by a command. No subjective criteria. -->
+- [ ] `{VERIFIER_COMMAND}` exits 0
+- [ ] Coverage ≥ {THRESHOLD}%
+- [ ] `{SECONDARY_CHECK}` passes
+
+## VERIFIER COMMAND
+```bash
+{VERIFIER_COMMAND}
+```
+
+## SCOPE
+**In scope:**
+- 
+
+**Out of scope:**
+- 
+
+## ASSUMPTIONS
+<!-- List every assumption explicitly. Surfacing assumptions prevents wasted loops. -->
+1. 
+2. 
+3. 
+
+## STATUS
+- [ ] Goal verified with human
+- [ ] Stop condition is machine-checkable
+- [ ] Scope boundaries clear
+- [ ] SNAP achieved ✅
+
+## SNAP LOG
+<!-- Written by main agent when snap condition is met -->

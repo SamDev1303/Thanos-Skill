@@ -1,14 +1,20 @@
-# THANOS_TIME.md — The Plan
-> 🟢 Time Stone — checkpoints, updated as work progresses.
+# 🔵 Time Stone — Loop History & Lessons
 
-## Status
-IN PROGRESS
+## LOOP COUNTER
+Current loop: 0
 
-## Checkpoints
-- [ ] 1. Read codebase, write THANOS_SPACE.md
-- [ ] 2. [Next checkpoint]
-- [ ] 3. [Next checkpoint]
-- [ ] 4. All proofs pass → SNAP COMPLETE ✅
+## HISTORY
 
-## Proof command
-`[same as THANOS_SOUL.md]`
+| Loop | Summary | Critic Score | Outcome |
+|------|---------|--------------|--------|
+| 0    | Initialized | - | Starting |
+
+## HERMES LESSONS
+<!-- Injected automatically after each failed critic check -->
+<!-- Format: [Loop N] Category: What happened and what was learned -->
+
+## RECURRING PATTERNS
+<!-- If same issue appears 3+ loops, escalate to human -->
+
+## ANTI-RULES ADDED
+<!-- Mirror of THANOS.md ANTI-RULES section for quick reference -->
