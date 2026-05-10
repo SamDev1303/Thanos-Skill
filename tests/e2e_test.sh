@@ -208,7 +208,7 @@ echo -e "\n${CYAN}[ GROUP 5 ] Hermes Self-Learning -- TIME Stone${RESET}"
 cat >> "$THANOS_DIR/TIME.md" <<'HERMES_EOF'
 
 ## Loop 1 Lesson
-[ANTI-RULE Loop 1]: NEVER hardcode secrets in source files because they leak to git history
+[ANTI-RULE Loop 1]: NEVER hardcoded secrets in source files because they leak to git history
 [ANTI-RULE Loop 1]: NEVER skip input validation on public functions because injection risk
 Loop Counter: 1
 HERMES_EOF
@@ -216,7 +216,7 @@ HERMES_EOF
 assert "TIME.md updated with loop lesson"  "$(has_content "$THANOS_DIR/TIME.md" 'Loop 1 Lesson')"
 assert "ANTI-RULE injected into TIME.md"   "$(has_content "$THANOS_DIR/TIME.md" 'ANTI-RULE')"
 assert "Loop counter incremented to 1"     "$(has_content "$THANOS_DIR/TIME.md" 'Loop Counter: 1')"
-assert "Security anti-rule written"        "$(has_content "$THANOS_DIR/TIME.md" 'hardcoded secrets')"
+assert "Security anti-rule written"        "$(has_content "$THANOS_DIR/TIME.md" 'hardcoded secret')"
 
 # ----------------------------------------------------------------
 # GROUP 6: Snap condition -- all scores >= 95
