@@ -1,0 +1,104 @@
+name: Thanos CI — E2E Tests + Deploy Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # ──────────────────────────────────────────
+  # JOB 1: Shell lint (fast, cheap, first gate)
+  # ──────────────────────────────────────────
+  lint:
+    name: 🔍 ShellCheck Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get install -y shellcheck
+
+      - name: Lint thanos.sh
+        run: shellcheck -S warning thanos.sh || true
+
+      - name: Lint install.sh
+        run: shellcheck -S warning install.sh || true
+
+      - name: Check all stone markdown files are non-empty
+        run: |
+          for f in THANOS.md GAUNTLET.md SKILL.md README.md; do
+            if [[ ! -s "$f" ]]; then
+              echo "❌ $f is missing or empty"
+              exit 1
+            else
+              echo "✅ $f OK ($(wc -c < "$f") bytes)"
+            fi
+          done
+
+      - name: Validate docs/index.html exists and is non-empty
+        run: |
+          if [[ ! -s "docs/index.html" ]]; then
+            echo "❌ docs/index.html is missing or empty"
+            exit 1
+          fi
+          echo "✅ docs/index.html OK ($(wc -c < docs/index.html) bytes)"
+
+  # ──────────────────────────────────────────
+  # JOB 2: Full E2E test suite
+  # ──────────────────────────────────────────
+  e2e:
+    name: 🧪 E2E Test Suite
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Make test executable
+        run: chmod +x tests/e2e_test.sh
+
+      - name: Run Thanos E2E tests
+        run: bash tests/e2e_test.sh
+
+  # ──────────────────────────────────────────
+  # JOB 3: Deploy to GitHub Pages (only on main push)
+  # ──────────────────────────────────────────
+  deploy-pages:
+    name: 🚀 Deploy GitHub Pages
+    runs-on: ubuntu-latest
+    needs: e2e
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload docs/ as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
