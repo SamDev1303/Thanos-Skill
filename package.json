@@ -1,0 +1,38 @@
+{
+  "name": "thanos-skill",
+  "version": "3.0.0",
+  "description": "⚡ Autonomous AI agent harness. Snap and it's done.",
+  "bin": {
+    "thanos": "./thanos.sh"
+  },
+  "scripts": {
+    "start": "./thanos.sh",
+    "test": "./thanos.sh --test",
+    "status": "./thanos.sh --status",
+    "reset": "./thanos.sh --reset",
+    "claude": "./thanos.sh claude",
+    "codex": "./thanos.sh codex",
+    "gemini": "./thanos.sh gemini"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "claude",
+    "codex",
+    "gemini",
+    "autonomous",
+    "self-healing",
+    "gsd",
+    "ralph-loop",
+    "agentic"
+  ],
+  "author": "ClaudeKing.org",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SamDev1303/Thanos-Skill"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
