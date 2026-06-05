@@ -388,7 +388,10 @@ timestamp() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 list_skill_ids() {
   local d id out=""
   [[ -d "$SKILLS_DIR" ]] || { echo ""; return 0; }
-  for d in "$SKILLS_DIR"/*/; do
+  local -a dirs=( "$SKILLS_DIR"/*/ )
+  # nullglob is not set; if the glob didn't expand, dirs[0] is the literal pattern.
+  [[ -e "${dirs[0]:-}" ]] || { echo ""; return 0; }
+  for d in "${dirs[@]}"; do
     [[ -f "${d}SKILL.md" ]] || continue
     id=$(basename "$d")
     out+="$id "
@@ -409,14 +412,20 @@ normalize_ids() {
 skill_requires() {
   local id="$1" f="$SKILLS_DIR/$1/SKILL.md"
   [[ -f "$f" ]] || return 0
-  awk 'NR==1&&/^---[[:space:]]*$/{fm=1;next} fm&&/^---[[:space:]]*$/{exit} fm&&/^requires:/{sub(/^requires:[[:space:]]*/,"");print}' "$f" | tr ',' ' '
+  # tr -d '[]' tolerates inline-list YAML (`requires: [a, b]`) as well as `requires: a, b`.
+  awk 'NR==1&&/^---[[:space:]]*$/{fm=1;next} fm&&/^---[[:space:]]*$/{exit} fm&&/^requires:/{sub(/^requires:[[:space:]]*/,"");print}' "$f" | tr -d '[]' | tr ',' ' '
 }
 
 # Read a single frontmatter scalar (e.g. purpose) from a skill.
+# Literal key compare (not regex) so a key with awk metacharacters can't mismatch.
 skill_field() {
   local id="$1" key="$2" f="$SKILLS_DIR/$1/SKILL.md"
   [[ -f "$f" ]] || return 0
-  awk -v k="^${key}:" 'NR==1&&/^---[[:space:]]*$/{fm=1;next} fm&&/^---[[:space:]]*$/{exit} fm&&$0~k{sub(/^[^:]*:[[:space:]]*/,"");print;exit}' "$f"
+  awk -v key="$key" '
+    NR==1&&/^---[[:space:]]*$/{fm=1;next}
+    fm&&/^---[[:space:]]*$/{exit}
+    fm{ i=index($0,":"); if(i>0){ k=substr($0,1,i-1); if(k==key){ v=substr($0,i+1); sub(/^[[:space:]]+/,"",v); print v; exit } } }
+  ' "$f"
 }
 
 # Run a tool adapter's --detect. Echoes the adapter's message; returns its code.
@@ -431,13 +440,17 @@ detect_tool() {
 
 # Best-effort headless invocation for the semantic Architect pre-pass (opt-in).
 _headless() {
-  local cli="$1" prompt="$2" TO=""
-  if command -v timeout  &>/dev/null; then TO="timeout 90";
-  elif command -v gtimeout &>/dev/null; then TO="gtimeout 90"; fi
+  local cli="$1" prompt="$2"
+  # Array form: safe even if the timeout binary path ever contains spaces, and
+  # expands to nothing (not an empty word) when no timeout command exists.
+  local -a TO=()
+  if   command -v timeout  &>/dev/null; then TO=(timeout 90)
+  elif command -v gtimeout &>/dev/null; then TO=(gtimeout 90); fi
+  # ${TO[@]+...} guard: safe empty-array expansion under `set -u` on bash 3.2 (macOS).
   case "$cli" in
-    claude) $TO claude -p "$prompt" ;;
-    codex)  $TO codex exec "$prompt" ;;
-    gemini) $TO gemini -p "$prompt" ;;
+    claude) ${TO[@]+"${TO[@]}"} claude -p "$prompt" ;;
+    codex)  ${TO[@]+"${TO[@]}"} codex exec "$prompt" ;;
+    gemini) ${TO[@]+"${TO[@]}"} gemini -p "$prompt" ;;
     *) return 1 ;;
   esac
 }
@@ -571,10 +584,11 @@ do_mobilize() {
     return 0
   fi
 
-  local chosen=""
+  local chosen="" invalid_explicit=0
   if [[ -n "$explicit" ]]; then
     chosen=$(normalize_ids "$explicit" "$available")
-    [[ -z "$chosen" ]] && warn "MOBILIZE: none of '$explicit' match installed skills [$available]"
+    # Explicit ids that match NOTHING is a caller error (typo) — signal it, don't pretend success.
+    [[ -z "$chosen" ]] && { warn "MOBILIZE: none of '$explicit' match installed skills [$available]"; invalid_explicit=1; }
   elif [[ "${THANOS_MOBILIZE_AUTO:-0}" == "1" ]]; then
     log "MOBILIZE: running semantic Architect pre-pass..."
     chosen=$(architect_select "$available") || chosen=""
@@ -583,7 +597,7 @@ do_mobilize() {
   if [[ -z "$chosen" ]]; then
     write_mobilize_pending "$available"
     log "MOBILIZE: pending — launched Architect will choose (see .thanos/MOBILIZED.md)"
-    return 0
+    return "$invalid_explicit"
   fi
 
   build_mobilized_md "$chosen"
@@ -1076,9 +1090,10 @@ main() {
       #   thanos --mobilize "visual-proof design"   # explicit ids
       #   thanos --mobilize                          # semantic (needs THANOS_MOBILIZE_AUTO=1)
       init_stones
-      do_mobilize "${2:-}"
-      success "MOBILIZED.md ready ($([[ -f "$MOBILIZED" ]] && wc -l < "$MOBILIZED" || echo 0) lines) — .thanos/MOBILIZED.md"
-      exit 0
+      local mrc=0
+      do_mobilize "${2:-}" || mrc=$?
+      success "MOBILIZED.md ready ($([[ -f "$MOBILIZED" ]] && wc -l < "$MOBILIZED" | tr -d ' ' || echo 0) lines) — .thanos/MOBILIZED.md"
+      exit "$mrc"
       ;;
     --capabilities|--caps)
       list_capabilities
