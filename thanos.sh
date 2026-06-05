@@ -29,7 +29,7 @@
 set -euo pipefail
 
 # ─── CONSTANTS ────────────────────────────────────────────────────────────────
-THANOS_VERSION="2.0.0"
+THANOS_VERSION="3.0.0"
 THANOS_DIR=".thanos"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_FILE="$SKILL_DIR/THANOS.md"
@@ -41,6 +41,15 @@ POWER="$THANOS_DIR/POWER.md"
 TIME_STONE="$THANOS_DIR/TIME.md"
 SPACE="$THANOS_DIR/SPACE.md"
 MIND="$THANOS_DIR/MIND.md"
+
+# ─── THE GAUNTLET SOCKET (v3 capabilities) ─────────────────────────────────────
+# Capabilities socket into the Gauntlet — they are NOT a 7th Infinity Stone.
+# skills/ = original guidance · tools/ = detect+invoke adapters · capabilities/ = catalog.
+MOBILIZED="$THANOS_DIR/MOBILIZED.md"          # built by MOBILIZE, injected into agent context
+PROOF_DIR="$THANOS_DIR/proof"                 # tool artifacts (screenshots, etc.) land here
+SKILLS_DIR="$SKILL_DIR/skills"
+TOOLS_DIR="$SKILL_DIR/tools"
+MANIFEST="$SKILL_DIR/capabilities/manifest.json"
 
 # Colours
 RED='\033[0;31m'; ORANGE='\033[0;33m'; YELLOW='\033[1;33m'
@@ -159,8 +168,8 @@ scan_project() {
     code_content+=$'\n'"=== FILE: $f ==="$'\n'
     code_content+=$(cat "$f" 2>/dev/null || echo "[unreadable]")
     code_content+=$'\n'
-    ((read_count++))
-    ((file_count++))
+    read_count=$((read_count + 1))
+    file_count=$((file_count + 1))
     [[ "$read_count" -ge 50 ]] && break
   done <<< "$file_tree"
 
@@ -269,11 +278,15 @@ TIME_EOF
 - [ ] Phase 0: DISCUSS — clarify goal, write to SOUL.md
 - [ ] Phase 1: ASSUMPTIONS — extract and list all assumptions
 - [ ] Phase 2: PLAN — write acceptance criteria, break into tasks
+- [ ] Phase 2.5: MOBILIZE — socket capability skills (detect-gated)
 - [ ] Phase 3: EXECUTE — sub agent builds
 - [ ] Phase 4: VERIFY — run verifier, update POWER.md
 - [ ] Phase 5: CRITIQUE — critic agent scores, update MIND.md
 - [ ] Phase 6: LEARN — Hermes injects lessons into TIME.md
 - [ ] SNAP — goal achieved ✅
+
+## Mobilized Capabilities
+[None yet — set during MOBILIZE. See .thanos/MOBILIZED.md. Empty = vanilla Thanos.]
 
 ## Blockers
 [None]
@@ -361,6 +374,245 @@ do_reset() {
   fi
 }
 
+# ─── MOBILIZE — THE GAUNTLET SOCKET (v3) ───────────────────────────────────────
+# Capabilities (skills/) socket into the Gauntlet for the current goal. MOBILIZE:
+#   1. Architect chooses skills SEMANTICALLY (from manifest catalog + SOUL goal).
+#   2. Required tool adapters are detect-gated — missing ones BLOCK (never silent).
+#   3. Chosen skills are concatenated into .thanos/MOBILIZED.md and injected into
+#      the EXECUTE/CRITIQUE agent context via build_system_prompt().
+# This is NOT a 7th Infinity Stone — the canon stays intact.
+
+timestamp() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
+
+# All installed skill ids (directories under skills/ that contain a SKILL.md).
+list_skill_ids() {
+  local d id out=""
+  [[ -d "$SKILLS_DIR" ]] || { echo ""; return 0; }
+  for d in "$SKILLS_DIR"/*/; do
+    [[ -f "${d}SKILL.md" ]] || continue
+    id=$(basename "$d")
+    out+="$id "
+  done
+  echo "${out% }"
+}
+
+# Keep only tokens (comma/space separated) that are actually installed skills.
+normalize_ids() {
+  local raw="${1//,/ }" avail=" $2 " out="" tok
+  for tok in $raw; do
+    [[ "$avail" == *" $tok "* ]] && out+="$tok "
+  done
+  echo "${out% }"
+}
+
+# Parse the `requires:` line from a skill's YAML frontmatter (tool ids).
+skill_requires() {
+  local id="$1" f="$SKILLS_DIR/$1/SKILL.md"
+  [[ -f "$f" ]] || return 0
+  awk 'NR==1&&/^---[[:space:]]*$/{fm=1;next} fm&&/^---[[:space:]]*$/{exit} fm&&/^requires:/{sub(/^requires:[[:space:]]*/,"");print}' "$f" | tr ',' ' '
+}
+
+# Read a single frontmatter scalar (e.g. purpose) from a skill.
+skill_field() {
+  local id="$1" key="$2" f="$SKILLS_DIR/$1/SKILL.md"
+  [[ -f "$f" ]] || return 0
+  awk -v k="^${key}:" 'NR==1&&/^---[[:space:]]*$/{fm=1;next} fm&&/^---[[:space:]]*$/{exit} fm&&$0~k{sub(/^[^:]*:[[:space:]]*/,"");print;exit}' "$f"
+}
+
+# Run a tool adapter's --detect. Echoes the adapter's message; returns its code.
+detect_tool() {
+  local t="$1" script="$TOOLS_DIR/$1.sh"
+  if [[ ! -f "$script" ]]; then
+    echo "no adapter found at tools/$t.sh"
+    return 3
+  fi
+  bash "$script" --detect
+}
+
+# Best-effort headless invocation for the semantic Architect pre-pass (opt-in).
+_headless() {
+  local cli="$1" prompt="$2" TO=""
+  if command -v timeout  &>/dev/null; then TO="timeout 90";
+  elif command -v gtimeout &>/dev/null; then TO="gtimeout 90"; fi
+  case "$cli" in
+    claude) $TO claude -p "$prompt" ;;
+    codex)  $TO codex exec "$prompt" ;;
+    gemini) $TO gemini -p "$prompt" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Semantic skill selection: ask the Architect which installed skills fit the goal.
+# Returns a space-separated subset of $available (possibly empty). Never keyword-routes.
+architect_select() {
+  local available="$1"
+  [[ "${THANOS_NO_MOBILIZE:-0}" == "1" ]] && { echo ""; return 0; }
+  local goal=""
+  [[ -f "$SOUL" ]] && goal=$(awk '/^## GOAL/{f=1;next} /^## /{f=0} f&&NF{print}' "$SOUL" | head -5)
+  [[ -z "$goal" ]] && { echo ""; return 0; }
+  local manifest_txt="{}"
+  [[ -f "$MANIFEST" ]] && manifest_txt=$(cat "$MANIFEST")
+  local cli
+  if ! cli=$(detect_cli auto 2>/dev/null); then echo ""; return 0; fi
+  local prompt
+  prompt="You are the Thanos Architect. Decide which capability skills to mobilize for this goal.
+GOAL:
+$goal
+
+CATALOG (capabilities/manifest.json):
+$manifest_txt
+
+Choose only skills whose purpose genuinely fits the goal. Output ONLY the chosen skill ids,
+space-separated, drawn from this exact set: $available
+If none fit, output: NONE
+No prose, no explanation."
+  local raw="" id out=""
+  if raw=$(_headless "$cli" "$prompt" 2>/dev/null); then
+    for id in $available; do
+      grep -qiw -- "$id" <<<"$raw" && out+="$id "
+    done
+  fi
+  echo "${out% }"
+}
+
+# Append a BLOCKED-DEPENDENCIES section to SPACE.md (install-or-skip, never silent).
+update_space_blocked() {
+  local blocked="$1"
+  [[ -f "$SPACE" ]] || return 0
+  {
+    echo ""
+    echo "## ⛔ Mobilized — Blocked Dependencies ($(timestamp))"
+    echo "These tools are required by mobilized skills but are NOT installed/usable."
+    echo "Architect: ask the user to install them, or mobilize without them. NEVER proceed silently."
+    printf '%s' "$blocked" | while IFS='|' read -r tool hint; do
+      [[ -z "$tool" ]] && continue
+      echo "- [ ] **$tool** — $hint"
+    done
+  } >> "$SPACE"
+}
+
+# Concatenate chosen skills into MOBILIZED.md and detect-gate their required tools.
+build_mobilized_md() {
+  local chosen="$1"
+  mkdir -p "$THANOS_DIR" "$PROOF_DIR"
+  {
+    echo "# 🧤 MOBILIZED CAPABILITIES"
+    echo "## Built: $(timestamp)"
+    echo "## Mobilized skills: ${chosen:-none}"
+    echo ""
+    echo "> These capabilities were socketed into the Gauntlet for THIS goal. Follow their"
+    echo "> guidance during EXECUTE and CRITIQUE. Tool artifacts belong in .thanos/proof/."
+    echo ""
+  } > "$MOBILIZED"
+
+  local blocked="" id t out rc
+  for id in $chosen; do
+    {
+      echo "---"
+      echo "## SKILL: $id"
+      cat "$SKILLS_DIR/$id/SKILL.md"
+      echo ""
+    } >> "$MOBILIZED"
+    for t in $(skill_requires "$id"); do
+      if out=$(detect_tool "$t" 2>&1); then rc=0; else rc=$?; fi
+      if [[ "$rc" -ne 0 ]]; then
+        blocked+="$t|$(echo "$out" | head -1)"$'\n'
+      fi
+    done
+  done
+
+  if [[ -n "$blocked" ]]; then
+    update_space_blocked "$blocked"
+    {
+      echo "---"
+      echo "## ⛔ BLOCKED DEPENDENCIES — install-or-skip (DO NOT proceed silently)"
+      printf '%s' "$blocked" | while IFS='|' read -r tool hint; do
+        [[ -z "$tool" ]] && continue
+        echo "- **$tool**: $hint"
+      done
+    } >> "$MOBILIZED"
+    warn "MOBILIZE: blocked tool(s) detected — recorded in SPACE.md (install-or-skip)"
+  fi
+}
+
+# Fallback MOBILIZED.md: instruct the launched agent (the Architect) to self-mobilize.
+write_mobilize_pending() {
+  local available="$1" id purpose
+  {
+    echo "# 🧤 MOBILIZE — PENDING (Architect must choose)"
+    echo "## Built: $(timestamp)"
+    echo ""
+    echo "No skills are mobilized yet. As the Architect, decide SEMANTICALLY which (if any) of the"
+    echo "installed capabilities below fit the goal in SOUL.md, then run:"
+    echo ""
+    echo '    bash thanos.sh --mobilize "<space-separated-skill-ids>"'
+    echo ""
+    echo "Then Read .thanos/MOBILIZED.md — it will hold the chosen skills' full guidance."
+    echo "If none genuinely fit, proceed with vanilla Thanos. Do NOT force a skill."
+    echo ""
+    echo "## Installed capabilities"
+    for id in $available; do
+      purpose=$(skill_field "$id" purpose)
+      echo "- **$id** — ${purpose:-(no purpose set)}"
+    done
+    echo ""
+    echo "Full catalog: capabilities/manifest.json"
+  } > "$MOBILIZED"
+}
+
+# Orchestrator. Pass an explicit space/comma list to skip semantic selection.
+do_mobilize() {
+  local explicit="${1:-}"
+  mkdir -p "$THANOS_DIR" "$PROOF_DIR"
+  local available; available=$(list_skill_ids)
+  if [[ -z "$available" ]]; then
+    warn "MOBILIZE: no skills installed — vanilla Thanos."
+    : > "$MOBILIZED"
+    return 0
+  fi
+
+  local chosen=""
+  if [[ -n "$explicit" ]]; then
+    chosen=$(normalize_ids "$explicit" "$available")
+    [[ -z "$chosen" ]] && warn "MOBILIZE: none of '$explicit' match installed skills [$available]"
+  elif [[ "${THANOS_MOBILIZE_AUTO:-0}" == "1" ]]; then
+    log "MOBILIZE: running semantic Architect pre-pass..."
+    chosen=$(architect_select "$available") || chosen=""
+  fi
+
+  if [[ -z "$chosen" ]]; then
+    write_mobilize_pending "$available"
+    log "MOBILIZE: pending — launched Architect will choose (see .thanos/MOBILIZED.md)"
+    return 0
+  fi
+
+  build_mobilized_md "$chosen"
+  success "MOBILIZE: socketed → $chosen"
+}
+
+# Print the capability catalog + installed skills.
+list_capabilities() {
+  banner
+  echo -e "${BOLD}🧤 THANOS CAPABILITIES — the Gauntlet socket${RESET}"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  local id purpose
+  local ids; ids=$(list_skill_ids)
+  if [[ -z "$ids" ]]; then
+    warn "No skills installed under skills/"
+  else
+    for id in $ids; do
+      purpose=$(skill_field "$id" purpose)
+      success "$id — ${purpose:-(no purpose set)}"
+    done
+  fi
+  echo ""
+  if [[ -f "$MANIFEST" ]]; then
+    echo -e "${DIM}Catalog: $MANIFEST${RESET}"
+  else
+    warn "No capabilities/manifest.json found."
+  fi
+}
+
 # ─── BUILD SYSTEM PROMPT ──────────────────────────────────────────────────────
 # This is the core: embed all six stones + THANOS.md into the agent's context
 build_system_prompt() {
@@ -383,6 +635,14 @@ build_system_prompt() {
       prompt+="$(cat "$path")"$'\n\n'
     fi
   done
+
+  # ── INJECTION HOOK ── mobilized capabilities for THIS goal (the v3 socket).
+  # Without this block the chosen skills never reach the agent's context.
+  if [[ -f "$MOBILIZED" ]] && [[ -s "$MOBILIZED" ]]; then
+    prompt+="---"$'\n'
+    prompt+="# 🧤 MOBILIZED CAPABILITIES (socketed for this goal)"$'\n'
+    prompt+="$(cat "$MOBILIZED")"$'\n\n'
+  fi
 
   # Inline goal if provided
   if [[ -n "$goal" ]]; then
@@ -496,10 +756,10 @@ run_tests() {
     local desc="$1" result="$2"
     if [[ "$result" == "0" ]]; then
       success "PASS: $desc"
-      ((pass++))
+      pass=$((pass + 1))
     else
       error "FAIL: $desc"
-      ((fail++))
+      fail=$((fail + 1))
     fi
   }
 
@@ -799,6 +1059,31 @@ main() {
       scan_project
       exit 0
       ;;
+    --detect)
+      # Detect-gate a tool adapter: thanos --detect screenshot
+      local tool="${2:-}"
+      [[ -z "$tool" ]] && die "Usage: thanos --detect <tool-id>"
+      if [[ ! -f "$TOOLS_DIR/$tool.sh" ]]; then
+        error "No adapter found: tools/$tool.sh"
+        exit 3
+      fi
+      local rc=0
+      bash "$TOOLS_DIR/$tool.sh" --detect || rc=$?
+      exit "$rc"
+      ;;
+    --mobilize|-m)
+      # Socket capabilities for the current goal.
+      #   thanos --mobilize "visual-proof design"   # explicit ids
+      #   thanos --mobilize                          # semantic (needs THANOS_MOBILIZE_AUTO=1)
+      init_stones
+      do_mobilize "${2:-}"
+      success "MOBILIZED.md ready ($([[ -f "$MOBILIZED" ]] && wc -l < "$MOBILIZED" || echo 0) lines) — .thanos/MOBILIZED.md"
+      exit 0
+      ;;
+    --capabilities|--caps)
+      list_capabilities
+      exit 0
+      ;;
     --help|-h)
       banner
       echo "USAGE:"
@@ -808,6 +1093,9 @@ main() {
       echo "  thanos gemini [goal]       Gemini CLI"
       echo "  thanos aider [goal]        Aider"
       echo "  thanos --discuss           Run goal clarification Q&A"
+      echo "  thanos --mobilize \"ids\"    Socket capability skills for the goal"
+      echo "  thanos --detect <tool>     Detect-gate a tool adapter (exit 0 = ready)"
+      echo "  thanos --capabilities      List installed capability skills + catalog"
       echo "  thanos --status            Print all six stones"
       echo "  thanos --reset             Wipe .thanos/ and start fresh"
       echo "  thanos --resume            Resume from last checkpoint"
@@ -846,6 +1134,14 @@ main() {
     run_discuss
     echo ""
   fi
+
+  # 3.5 MOBILIZE — socket capabilities into the Gauntlet for this goal.
+  # Builds .thanos/MOBILIZED.md (real if THANOS_MOBILIZE_AUTO=1, else a pending
+  # stub the launched Architect completes via `thanos --mobilize`). Either way the
+  # block is injected into the agent context by build_system_prompt().
+  log "MOBILIZE: socketing capabilities for the goal..."
+  do_mobilize ""
+  echo ""
 
   # 4. Print status before launch
   print_status
