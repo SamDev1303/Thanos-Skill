@@ -36,6 +36,7 @@ main() {
   mkdir -p "$(dirname "$out")"
 
   local tmpd; tmpd=$(mktemp -d)
+  trap 'rm -rf "$tmpd"' EXIT   # clean up even on an unexpected set -e exit (matches graph.sh)
   _info "transcribing $audio (model=$model) — first run downloads the model, be patient"
   local wc; wc=$(whisper_cmd)
   if ! $wc "$audio" --model "$model" --output_format txt --output_dir "$tmpd" >/dev/null 2>&1; then

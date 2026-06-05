@@ -125,7 +125,7 @@ main() {
   _info "capturing $url → $out (${W}x${H}, settle ${settle}ms, full-page)"
   if ! "$pw" screenshot \
         --full-page \
-        --viewport-size "${W}, ${H}" \
+        --viewport-size "${W},${H}" \
         --wait-for-timeout "$settle" \
         "$url" "$out" >/dev/null 2>&1; then
     _err "playwright capture failed for $url"
