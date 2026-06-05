@@ -15,7 +15,7 @@
 | **P4** | Remaining bundles — `design`, `context-graph`, `media-comms` + 5 tool adapters | ✅ **done** (video/notes/graph real artifacts; email blocked-path; transcribe detect) | _next commit_ |
 | **P5** | Tests & docs — extend `tests/`, rewrite README, `--test` green | ✅ **done** (e2e 49/49, internal 26/0; README capabilities section) | _next commit_ |
 | **P6** | Re-review — independent reviewer + shellcheck; apply blocking fixes | ✅ **done** (4 fixes applied; e2e 50/50; no shellcheck errors) | _next commit_ |
-| **P7** | Ship — push branch + PR, delete accidental fork, remove old local dir | ⬜ pending | — |
+| **P7** | Ship — push branch + PR, delete accidental fork, remove old local dir | 🔄 **PR #1 open, CI green, Greptile addressed**; fork-delete pending auth-scope refresh; local-dir removal last | `0296a2f` pushed |
 
 **Working location:** `~/Desktop/Thanos-Skill` (fresh clone) · branch `feat/master-gsd-v3`
 **Base engine:** `SamDev1303/Thanos-Skill` (MIT) · **Fork to delete at P7:** `SamDev1303/Mykoala---GET-SHIT-DONE-`
