@@ -11,7 +11,7 @@
 |---|---|---|---|
 | **P1** | Bootstrap — scaffold `skills/ tools/ capabilities/ docs/CREDITS.md` + LICENSE | ✅ **done** | `2a059f9` |
 | **P2** | Engine — MOBILIZE in `thanos.sh`, `THANOS.md`, `GAUNTLET.md`, `SKILL.md`, templates, install | ✅ **done** | `7802a57`, `03a0796` |
-| **P3** | PROOF gate — `visual-proof` skill + `screenshot.sh` + `manifest.json`, wired e2e | 🔄 **in progress** | — |
+| **P3** | PROOF gate — `visual-proof` skill + `screenshot.sh` + `manifest.json`, wired e2e | ✅ **mechanical gate passed** (LLM E2E + rubric differential → P5) | _next commit_ |
 | **P4** | Remaining bundles — `design`, `context-graph`, `media-comms` + tools | ⬜ pending | — |
 | **P5** | Tests & docs — extend `tests/`, rewrite README, `--test` green | ⬜ pending | — |
 | **P6** | Re-review — Gemini + Haiku on built code; apply blocking fixes | ⬜ pending | — |
@@ -24,11 +24,12 @@
 | Criterion | Status |
 |---|---|
 | `bash thanos.sh --test` existing E2E green | ✅ 26/0 (also fixed a pre-existing `((x++))`+`set -e` bug that had it failing) |
-| Injection hook: UI-goal MOBILIZE → `MOBILIZED.md` greps visual-proof | ⬜ P3 |
-| Detect gate: `screenshot.sh --detect` non-zero+hint when Playwright absent, 0 when present | ⬜ P3 |
-| Screenshot: served `index.html` → non-empty PNG | ⬜ P3 |
-| Visual rubric differential: lower score without PNG vs. with good PNG | ⬜ P3/P5 |
-| E2E: `thanos claude "build a landing page"` → visual-proof mobilizes, PNG in `.thanos/proof/` | ⬜ P3 |
+| Injection hook: UI-goal MOBILIZE → `MOBILIZED.md` greps visual-proof | ✅ header + body injected (4.5KB) |
+| Detect gate: `screenshot.sh --detect` non-zero+hint when Playwright absent, 0 when present | ✅ both directions |
+| Screenshot: served `index.html` → non-empty PNG | ✅ 239KB 1024×640 PNG, http not file:// |
+| Blocking gate: blocked dep → SPACE.md + MOBILIZED.md (not silent) | ✅ recorded both places |
+| Visual rubric differential: lower score without PNG vs. with good PNG | ⬜ P5 (real headless critic) |
+| E2E: `thanos claude "build a landing page"` → visual-proof mobilizes, PNG in `.thanos/proof/` | ⬜ P5 (manual/headless) |
 | Re-review blocking findings fixed | ⬜ P6 |
 
 ### Environment facts (verified this session)

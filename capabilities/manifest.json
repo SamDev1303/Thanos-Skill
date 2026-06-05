@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "description": "Capability catalog. The Architect reads this and SEMANTICALLY chooses which skills to mobilize for the goal in SOUL.md. Not a router — judgment, not keyword matching. Empty selection = vanilla Thanos.",
+  "skills": {
+    "visual-proof": {
+      "purpose": "Capture real screenshots of rendered UI so visual work has objective proof, not prose.",
+      "trigger_examples": [
+        "build a landing page",
+        "redesign the dashboard",
+        "style the homepage",
+        "the button looks wrong",
+        "make the UI look premium",
+        "match this screenshot",
+        "add a hero section"
+      ],
+      "skill": "skills/visual-proof/SKILL.md",
+      "requires": ["screenshot"]
+    }
+  }
+}

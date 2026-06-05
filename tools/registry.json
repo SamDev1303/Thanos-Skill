@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "description": "Tool adapters. Each entry: detect (the --detect command), install_hint (what to run if missing), invoke (usage). Adapters are thin wrappers around a CLI the user installs SEPARATELY — zero license entanglement. Added per-tool as each capability bundle lands.",
+  "tools": {
+    "screenshot": {
+      "detect": "tools/screenshot.sh --detect",
+      "install_hint": "npm i -D playwright && npx playwright install chromium   (or: brew install playwright && playwright install chromium)",
+      "invoke": "tools/screenshot.sh <url-or-local-path> [out.png] [width] [height]",
+      "artifacts": ".thanos/proof/*.png",
+      "engine": "playwright (browser) + python3 (ephemeral static server for local files)"
+    }
+  }
+}
