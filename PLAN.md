@@ -14,7 +14,7 @@
 | **P3** | PROOF gate — `visual-proof` skill + `screenshot.sh` + `manifest.json`, wired e2e | ✅ **mechanical gate passed** (LLM E2E + rubric differential → P5) | _next commit_ |
 | **P4** | Remaining bundles — `design`, `context-graph`, `media-comms` + 5 tool adapters | ✅ **done** (video/notes/graph real artifacts; email blocked-path; transcribe detect) | _next commit_ |
 | **P5** | Tests & docs — extend `tests/`, rewrite README, `--test` green | ✅ **done** (e2e 49/49, internal 26/0; README capabilities section) | _next commit_ |
-| **P6** | Re-review — Gemini + Haiku on built code; apply blocking fixes | ⬜ pending | — |
+| **P6** | Re-review — independent reviewer + shellcheck; apply blocking fixes | ✅ **done** (4 fixes applied; e2e 50/50; no shellcheck errors) | _next commit_ |
 | **P7** | Ship — push branch + PR, delete accidental fork, remove old local dir | ⬜ pending | — |
 
 **Working location:** `~/Desktop/Thanos-Skill` (fresh clone) · branch `feat/master-gsd-v3`
@@ -114,6 +114,21 @@ All findings triaged and the actionable ones **fixed before P3 build proceeds** 
 | 5 | Medium | `do_mobilize "bad-id"` (explicit ids matching nothing) returned exit 0 | **Fixed** — returns non-zero on invalid explicit ids; `--mobilize` propagates the code |
 
 _*Reviewer rated #1 Critical but noted it "does not crash today"; treated as a latent footgun and fixed anyway._
+
+## 📝 Code Review — P3–P5 (P6 re-review, 2026-06-05)
+
+Independent reviewer on the tool adapters + tests. Actionable findings fixed; rest self-confirmed correct.
+
+| # | Sev | Finding | Resolution |
+|---|---|---|---|
+| 1 | High | `graph.sh` leaks its temp file if the python pass fails under `set -e` (no trap) | **Fixed** — `trap 'rm -f "$tmplist"' EXIT` |
+| 2 | High | e2e GROUP 12 email-detect is host-dependent (fails if `react-email` is installed) | **Fixed** — run with stripped `PATH` to force the absent scenario |
+| 3 | High | e2e GROUP 11 invalid-id assert could pass for the wrong reason if `MOB_PROJ` setup failed | **Fixed** — added a setup guard assert |
+| 4 | Med | `screenshot.sh` `PORT` could be unbound under `set -u` | **Fixed** — initialized `PORT=""` at global scope (it's read in `main`, so can't be `local`) |
+
+**Also:** shellcheck (CI's lint gate) run on all shell — **no error-level issues**; remaining warnings are
+pre-existing (thanos.sh:162 case-pattern, e2e:39 `cd`) or trivial (SC2155/SC2034) and cleaned in new code.
+Suites after fixes: standalone **50/50**, internal **26/0**.
 
 **Closed-by-review (no action needed):** awk frontmatter parsers correctly scope to the first two `---`
 lines and handle missing frontmatter; `--detect` honors the adapter exit code; blocked tools always

@@ -288,6 +288,9 @@ assert "SOUL.md has ACTIVE status"             "$(has_content "$THANOS_DIR/SOUL.
 echo -e "\n${CYAN}[ GROUP 11 ] Capability Socket -- Injection Hook${RESET}"
 MOB_PROJ="$TEST_DIR/mob_proj"
 mkdir -p "$MOB_PROJ"; ( cd "$MOB_PROJ" && echo '{"name":"mob"}' > package.json )
+# Guard: if setup failed, fail loudly rather than letting downstream cd-failures
+# make the invalid-id exit-code assert pass for the wrong reason.
+assert "MOBILIZE test project was created" "$([[ -d "$MOB_PROJ" ]] && echo true || echo false)"
 (
   cd "$MOB_PROJ"
   bash "$SKILL_ROOT/thanos.sh" --mobilize "visual-proof" >/dev/null 2>&1 </dev/null
@@ -312,9 +315,10 @@ echo -e "\n${CYAN}[ GROUP 12 ] Tool Adapters -- Detect Gate${RESET}"
 NOTES_RC=0; bash "$SKILL_ROOT/tools/notes.sh" --detect >/dev/null 2>&1 </dev/null || NOTES_RC=$?
 assert "notes.sh --detect ready (exit 0)"               "$([[ $NOTES_RC -eq 0 ]] && echo true || echo false)"
 
-# email: react-email is not a CI/runtime dep -> must block (non-zero) with a hint
-EMAIL_ERR=$(bash "$SKILL_ROOT/tools/email.sh" --detect 2>&1 >/dev/null </dev/null) || true
-EMAIL_RC=0; bash "$SKILL_ROOT/tools/email.sh" --detect >/dev/null 2>&1 </dev/null || EMAIL_RC=$?
+# email: force the "absent" scenario with a stripped PATH so the test is deterministic
+# whether or not react-email happens to be installed on the host.
+EMAIL_ERR=$(PATH="/usr/bin:/bin" bash "$SKILL_ROOT/tools/email.sh" --detect 2>&1 >/dev/null </dev/null) || true
+EMAIL_RC=0; PATH="/usr/bin:/bin" bash "$SKILL_ROOT/tools/email.sh" --detect >/dev/null 2>&1 </dev/null || EMAIL_RC=$?
 assert "email.sh --detect blocks when react-email absent (non-zero)" "$([[ $EMAIL_RC -ne 0 ]] && echo true || echo false)"
 assert "email.sh --detect emits an install hint"        "$(echo "$EMAIL_ERR" | grep -qi 'install' && echo true || echo false)"
 

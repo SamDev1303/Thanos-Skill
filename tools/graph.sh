@@ -36,6 +36,7 @@ main() {
   # NOTE: pass the listing via a temp file (argv), NOT stdin — the <<PYEOF heredoc
   # already claims python's stdin, so a piped listing would be silently ignored.
   local tmplist; tmplist=$(mktemp)
+  trap 'rm -f "$tmplist"' EXIT   # clean up even if the python pass fails under set -e
   printf '%s\n' "$listing" > "$tmplist"
   python3 - "$prefix" "$tmplist" <<'PYEOF'
 import sys, re, json, os

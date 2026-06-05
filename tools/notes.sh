@@ -33,7 +33,7 @@ main() {
   local v; v="$(vault)"
   local date_h; date_h="$(date -u +"%Y-%m-%d")"
   local ts; ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-  local file="$v/${date_h}-$(slug "$title").md"
+  local file; file="$v/${date_h}-$(slug "$title").md"
 
   {
     echo "---"

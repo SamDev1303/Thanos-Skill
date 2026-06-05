@@ -52,8 +52,8 @@ cleanup() { [[ -n "${SERVER_PID:-}" ]] && kill "$SERVER_PID" 2>/dev/null || true
 trap cleanup EXIT INT TERM
 
 wait_for_port() {
-  local port="$1" i
-  for i in $(seq 1 60); do
+  local port="$1" _
+  for _ in $(seq 1 60); do
     if python3 - "$port" <<'PYEOF'
 import socket, sys
 s = socket.socket(); s.settimeout(0.25)
@@ -65,6 +65,7 @@ PYEOF
   return 1
 }
 
+PORT=""
 start_server() {
   local dir="$1"
   # Pick a high random port and start a quiet, localhost-only static server.
