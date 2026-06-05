@@ -55,11 +55,28 @@ mkdir -p "$AGENTS_SKILL_DIR"
 cp "$INSTALL_DIR/SKILL.md" "$AGENTS_SKILL_DIR/SKILL.md"
 cp "$INSTALL_DIR/THANOS.md" "$AGENTS_SKILL_DIR/THANOS.md"
 
+# v3 — stage the capability socket alongside each skill install so MOBILIZE works
+# anywhere thanos runs. skills/ = guidance · tools/ = adapters · capabilities/ = catalog.
+stage_socket() {
+  local dest="$1"
+  for sub in skills tools capabilities docs GAUNTLET.md; do
+    if [ -e "$INSTALL_DIR/$sub" ]; then
+      cp -R "$INSTALL_DIR/$sub" "$dest/" 2>/dev/null || true
+    fi
+  done
+  # tool adapters must stay executable
+  if [ -d "$dest/tools" ]; then chmod +x "$dest"/tools/*.sh 2>/dev/null || true; fi
+}
+stage_socket "$CLAUDE_SKILL_DIR"
+stage_socket "$CODEX_SKILL_DIR"
+stage_socket "$AGENTS_SKILL_DIR"
+
 echo ""
 echo -e "${GREEN}✓ Thanos installed globally${NC}"
 echo -e "${GREEN}✓ Claude skill: $CLAUDE_SKILL_DIR${NC}"
 echo -e "${GREEN}✓ Codex skill: $CODEX_SKILL_DIR${NC}"
 echo -e "${GREEN}✓ Agents skill: $AGENTS_SKILL_DIR${NC}"
+echo -e "${GREEN}✓ Capabilities socket staged (skills/ tools/ capabilities/)${NC}"
 echo ""
 echo -e "${CYAN}Add to PATH if needed:${NC}"
 echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""

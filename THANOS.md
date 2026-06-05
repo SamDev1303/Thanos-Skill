@@ -66,8 +66,19 @@ LOOP START
 │       Write acceptance criteria BEFORE any code.
 │       Break into phases in SPACE.md:
 │       Phase 0: Discuss → Phase 1: Assumptions → Phase 2: Plan
-│       → Phase 3: Execute → Phase 4: Verify → Phase 5: Critique
+│       → Phase 2.5: Mobilize → Phase 3: Execute → Phase 4: Verify → Phase 5: Critique
 │       Update SPACE.md with next action.
+│
+├── 4.5 MOBILIZE PHASE (the Gauntlet socket — v3)  ← NEW
+│       As the Architect, read .thanos/SOUL.md (the goal) and the capability
+│       catalog at capabilities/manifest.json. SEMANTICALLY decide which (if any)
+│       skills genuinely fit — there is NO keyword routing. Then run:
+│           bash thanos.sh --mobilize "<space-separated-skill-ids>"
+│       This concatenates the chosen skills/*/SKILL.md into .thanos/MOBILIZED.md
+│       AND detect-gates each skill's required tools. Read MOBILIZED.md back into
+│       context before executing. If a required tool is BLOCKED (see SPACE.md),
+│       ask the user install-or-skip — never proceed silently as if it were present.
+│       If no skill fits, mobilize nothing: vanilla Thanos is the correct fallback.
 │
 ├── 5. EXECUTE PHASE (Sub Agent)
 │       Sub agent executes ONE scoped action.
@@ -121,6 +132,35 @@ LOOP END
 
 ---
 
+## 🧤 MOBILIZE — CAPABILITIES SOCKET (v3)
+
+Thanos stays the **engine**. Capabilities **socket into the Gauntlet** — they are NOT a 7th
+Infinity Stone, so the canon stays intact.
+
+- **`skills/<id>/SKILL.md`** — original, general best-practice guidance (no upstream IP).
+- **`tools/<id>.sh`** — thin adapters that `--detect` and invoke a CLI the user installs separately.
+- **`capabilities/manifest.json`** — the **catalog** you read to choose skills.
+
+**The selection is SEMANTIC, made by you (the Architect) — never regex/keyword routing.** Read the
+goal in `SOUL.md`, read the catalog, and choose only skills whose `purpose` genuinely matches. When
+in doubt, choose fewer (mobilizing irrelevant skills just bloats context). When nothing matches,
+mobilize nothing.
+
+**Mechanics (the injection hook):**
+1. `bash thanos.sh --mobilize "visual-proof"` concatenates the chosen skills into
+   `.thanos/MOBILIZED.md` and runs each required tool's `--detect`.
+2. Blocked tools are written to `.thanos/SPACE.md` (and echoed into `MOBILIZED.md`). Resolve them
+   with the user (install-or-skip) **before** relying on that tool.
+3. The next agent launch injects `MOBILIZED.md` into the system prompt automatically; mid-session,
+   simply **Read `.thanos/MOBILIZED.md`** to load the guidance.
+4. Tool artifacts (screenshots, renders, transcripts) land in `.thanos/proof/` and become evidence
+   for the POWER and MIND stones.
+
+**Tool readiness is a BLOCKING gate, not a hint.** If `--detect` fails, the capability is not
+available — say so, surface the install hint, and ask. Do not pretend the artifact exists.
+
+---
+
 ## 🧬 HERMES MODE — SELF-HEALING RULES
 
 Hermes is the self-improvement protocol. These rules apply every loop:
@@ -154,6 +194,7 @@ These commands can be used to invoke specific phases:
 |---------|--------|
 | `THANOS:discuss` | Force a deep Q&A goal clarification session |
 | `THANOS:plan` | Generate phase plan and write to SPACE.md |
+| `THANOS:mobilize` | Semantically pick capability skills → build MOBILIZED.md (detect-gated) |
 | `THANOS:execute` | Run one sub-agent execution cycle |
 | `THANOS:verify` | Run verifier command and update POWER.md |
 | `THANOS:critique` | Spawn critic agent, score, write MIND.md |

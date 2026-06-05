@@ -83,10 +83,26 @@ Test Coverage (0-100)
    <80: Insufficient tests → BLOCKING
    <95: Loop continues
 
-Visual/UI Proof (0-100 or SKIP if no UI changes)
-  100: Screenshot/render provided, matches expected output
-    0: UI change made but no visual proof → ALWAYS BLOCKING
+Visual/UI Proof (0-100 or SKIP if no UI changes)  ── REDEFINED in v3 ──
+  A screenshot is the EVIDENCE, not the score. Existence of a PNG proves the page
+  rendered; it says NOTHING about whether the design is good. The score measures
+  how well you can JUSTIFY the visual result against the goal.
+
+     0: UI change made but NO visual proof (.thanos/proof/*.png) → ALWAYS BLOCKING
+   1-30: A PNG exists but the critique is "a screenshot is present" with no design
+         reasoning. Mere existence caps here. Still BLOCKING (< 95).
+  31-70: PNG present AND you confirm it renders correctly (no overflow, no broken
+         layout, content visible) — but you have NOT articulated why it is GOOD.
+  71-94: PNG present AND you articulate SPECIFIC design strengths and weaknesses:
+         visual hierarchy, spacing rhythm, contrast/legibility, alignment, balance,
+         responsive behavior — citing what you see in the image.
+  95-100: PNG present AND a thorough, evidence-based justification of why the design
+         achieves the goal: every claim ties to something visible in the screenshot,
+         weaknesses are named and judged non-blocking. "It looks fine" never scores here.
   SKIP: No UI changes in this loop
+
+  RULE: You may NOT raise this score just because a PNG exists. If you cannot point
+  to specific, visible design qualities in the proof image, the score stays ≤ 30.
 
 Security (0-100)
   100: No vulnerabilities, secrets safe, inputs sanitized
@@ -110,6 +126,36 @@ ELSE:
     List all scores < 95 with specific file:line issues
     Prioritize: Logic > Security > Coverage > Visual > Quality > Performance
 ```
+
+---
+
+## The Socket — Capabilities (v3)
+
+The Gauntlet is the glove that holds the stones. In v3 it also exposes a **socket** that
+capabilities plug into for the current goal — without adding a 7th stone.
+
+```
+        ┌─────────────────────── THE GAUNTLET ───────────────────────┐
+        │  🟠SOUL 🔴REALITY 💜POWER 🔵TIME 🔷SPACE 🟡MIND              │
+        │                                                            │
+        │   ┌──────── SOCKET (MOBILIZE) ────────┐                    │
+        │   │ capabilities/manifest.json (catalog)│  ← Architect reads │
+        │   │ skills/<id>/SKILL.md   (guidance)   │  → picks SEMANTICALLY│
+        │   │ tools/<id>.sh --detect (gate+invoke)│  → detect or BLOCK  │
+        │   └──────────────┬─────────────────────┘                    │
+        │                  ▼                                          │
+        │         .thanos/MOBILIZED.md  → injected into agent context │
+        │         .thanos/proof/*       → evidence for POWER / MIND   │
+        └────────────────────────────────────────────────────────────┘
+```
+
+**Registry contract:**
+- The **Architect** chooses skills *semantically* from the catalog (never keyword routing).
+- `thanos.sh --mobilize "<ids>"` builds `MOBILIZED.md` and runs each skill's required
+  `tools/<id>.sh --detect`.
+- A failed `--detect` is a **blocking dependency** written to `SPACE.md` — install-or-skip with the
+  user. The harness never silently proceeds with a missing tool.
+- When nothing in the catalog fits the goal, the socket stays empty and Thanos runs vanilla.
 
 ---
 
