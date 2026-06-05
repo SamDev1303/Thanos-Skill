@@ -25,6 +25,10 @@ else echo "[skip] no headless agent CLI (claude/gemini/codex) found."; exit 0; f
 echo "[info] using $CLI for the differential"
 
 RUBRIC=$(sed -n '/Visual\/UI Proof (0-100 or SKIP/,/score stays/p' "$SKILL_ROOT/GAUNTLET.md")
+if [[ -z "${RUBRIC//[[:space:]]/}" ]]; then
+  echo "[skip] could not extract the Visual rubric from GAUNTLET.md (wording drift) — not running the model."
+  exit 0
+fi
 
 ask() {
   local scenario="$1"

@@ -291,10 +291,9 @@ mkdir -p "$MOB_PROJ"; ( cd "$MOB_PROJ" && echo '{"name":"mob"}' > package.json )
 # Guard: if setup failed, fail loudly rather than letting downstream cd-failures
 # make the invalid-id exit-code assert pass for the wrong reason.
 assert "MOBILIZE test project was created" "$([[ -d "$MOB_PROJ" ]] && echo true || echo false)"
-(
-  cd "$MOB_PROJ"
-  bash "$SKILL_ROOT/thanos.sh" --mobilize "visual-proof" >/dev/null 2>&1 </dev/null
-) || true
+MOB_RC=0
+( cd "$MOB_PROJ" && bash "$SKILL_ROOT/thanos.sh" --mobilize "visual-proof" >/dev/null 2>&1 </dev/null ) || MOB_RC=$?
+assert "MOBILIZE happy-path (visual-proof) exits 0"     "$([[ $MOB_RC -eq 0 ]] && echo true || echo false)"
 MOB_FILE="$MOB_PROJ/.thanos/MOBILIZED.md"
 assert "MOBILIZE builds .thanos/MOBILIZED.md"            "$(has_file "$MOB_FILE")"
 assert "injection hook: MOBILIZED.md has visual-proof skill header" "$(has_content "$MOB_FILE" 'SKILL: visual-proof')"

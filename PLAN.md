@@ -61,6 +61,8 @@ skill modules + thin tool adapters), not source-vendored.
 - **Visual proof is real, screenshot.sh is NOT thin.** Ephemeral dev server (or serve build dir),
   DOM-idle wait, capture to `.thanos/proof/*.png`. MIND Visual rubric redefined so "a PNG exists"
   scores ≤3; higher scores require the critic to articulate *why* the design works.
+  _(Note: the original plan said "≤3"; the final v3 rubric implements this as **≤30** on the 0–100
+  scale — see `GAUNTLET.md` and `README.md`, the canonical sources.)_
 - **License-safe.** Skills hold only original general best-practice guidance. GPL repos (hackingtool)
   are adapter-invoke only. `docs/CREDITS.md` = attribution. Repo stays MIT.
 - **Sequenced to avoid 28-tool burnout.** Socket + ONE capability (visual-proof) shipped and verified

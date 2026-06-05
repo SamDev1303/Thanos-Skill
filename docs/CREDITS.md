@@ -44,7 +44,7 @@ redistribute any of their source code.
 | Project | Role | License |
 |---|---|---|
 | graphify | code-as-graph context modelling (inspiration) | (verify upstream) |
-| [vercel-labs/opensrc](https://github.com/vercel-labs) | open-source context extraction (inspiration) | (verify upstream) |
+| vercel-labs (org — exact repo unconfirmed) — [github.com/vercel-labs](https://github.com/orgs/vercel-labs/repositories) | open-source context extraction (inspiration) | (verify upstream) |
 | caveman | minimal/cheap context capture (inspiration) | (verify upstream) |
 
 ### `skills/media-comms` — transcription, video, email, notes
