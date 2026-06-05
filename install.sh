@@ -55,11 +55,39 @@ mkdir -p "$AGENTS_SKILL_DIR"
 cp "$INSTALL_DIR/SKILL.md" "$AGENTS_SKILL_DIR/SKILL.md"
 cp "$INSTALL_DIR/THANOS.md" "$AGENTS_SKILL_DIR/THANOS.md"
 
+# v3 — stage the capability socket alongside each skill install so MOBILIZE works
+# anywhere thanos runs. skills/ = guidance · tools/ = adapters · capabilities/ = catalog.
+stage_socket() {
+  local dest="$1" sub
+  for sub in skills tools capabilities docs GAUNTLET.md; do
+    if [ -e "$INSTALL_DIR/$sub" ]; then
+      cp -R "$INSTALL_DIR/$sub" "$dest/" || { echo "⚠ failed to stage $sub → $dest" >&2; return 1; }
+    fi
+  done
+  # tool adapters must stay executable
+  if [ -d "$dest/tools" ]; then chmod +x "$dest"/tools/*.sh || { echo "⚠ chmod failed in $dest/tools" >&2; return 1; }; fi
+  # Verify the socket actually landed — don't claim success silently if it didn't.
+  if [ ! -f "$dest/capabilities/manifest.json" ] || [ ! -x "$dest/tools/screenshot.sh" ]; then
+    echo "⚠ socket incomplete in $dest (missing manifest.json or tools/screenshot.sh)" >&2
+    return 1
+  fi
+  return 0
+}
+socket_ok=1
+for d in "$CLAUDE_SKILL_DIR" "$CODEX_SKILL_DIR" "$AGENTS_SKILL_DIR"; do
+  stage_socket "$d" || socket_ok=0
+done
+
 echo ""
 echo -e "${GREEN}✓ Thanos installed globally${NC}"
 echo -e "${GREEN}✓ Claude skill: $CLAUDE_SKILL_DIR${NC}"
 echo -e "${GREEN}✓ Codex skill: $CODEX_SKILL_DIR${NC}"
 echo -e "${GREEN}✓ Agents skill: $AGENTS_SKILL_DIR${NC}"
+if [ "$socket_ok" -eq 1 ]; then
+  echo -e "${GREEN}✓ Capabilities socket staged (skills/ tools/ capabilities/)${NC}"
+else
+  echo -e "${CYAN}⚠ Capabilities socket staging had errors — MOBILIZE may be degraded (see warnings above)${NC}"
+fi
 echo ""
 echo -e "${CYAN}Add to PATH if needed:${NC}"
 echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""

@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "description": "Capability catalog. The Architect reads this and SEMANTICALLY chooses which skills to mobilize for the goal in SOUL.md. Not a router — judgment, not keyword matching. Empty selection = vanilla Thanos.",
+  "skills": {
+    "visual-proof": {
+      "purpose": "Capture real screenshots of rendered UI so visual work has objective proof, not prose.",
+      "trigger_examples": [
+        "build a landing page",
+        "redesign the dashboard",
+        "style the homepage",
+        "the button looks wrong",
+        "make the UI look premium",
+        "match this screenshot",
+        "add a hero section"
+      ],
+      "skill": "skills/visual-proof/SKILL.md",
+      "requires": ["screenshot"]
+    },
+    "design": {
+      "purpose": "Make UI work look intentional and premium — taste, hierarchy, and craft, not AI slop.",
+      "trigger_examples": [
+        "make it look good",
+        "redesign this",
+        "polish the UI",
+        "it looks generic",
+        "improve the styling",
+        "premium design",
+        "match this aesthetic"
+      ],
+      "skill": "skills/design/SKILL.md",
+      "requires": ["screenshot"]
+    },
+    "context-graph": {
+      "purpose": "Build a structural map of the codebase so REALITY is richer and cheaper than dumping files.",
+      "trigger_examples": [
+        "understand this codebase",
+        "where is X defined",
+        "map the architecture",
+        "how do these modules connect",
+        "refactor across the repo",
+        "large repo context"
+      ],
+      "skill": "skills/context-graph/SKILL.md",
+      "requires": ["graph"]
+    },
+    "media-comms": {
+      "purpose": "Produce and handle media/comms artifacts — transcripts, video, email, durable notes.",
+      "trigger_examples": [
+        "transcribe this audio",
+        "turn this into a video",
+        "render an email",
+        "save this as a note",
+        "generate a clip",
+        "make a slideshow"
+      ],
+      "skill": "skills/media-comms/SKILL.md",
+      "requires": ["transcribe", "video", "email", "notes"]
+    }
+  }
+}

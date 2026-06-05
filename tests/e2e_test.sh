@@ -10,6 +10,8 @@ PASS=0; FAIL=0
 TEST_DIR=$(mktemp -d /tmp/thanos_e2e_XXXXXX)
 ORIGINAL_DIR="$PWD"
 THANOS_DIR="$TEST_DIR/.thanos"
+# Resolve the repo root NOW (before any cd) so v3 socket tests can find thanos.sh/tools/.
+SKILL_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 cleanup() { rm -rf "$TEST_DIR"; cd "$ORIGINAL_DIR" 2>/dev/null || true; }
 trap cleanup EXIT
@@ -275,6 +277,84 @@ assert "SOUL.md has VERIFIER COMMAND section"  "$(has_content "$THANOS_DIR/SOUL.
 assert "SOUL.md has machine-verifiable exit 0" "$(has_content "$THANOS_DIR/SOUL.md" 'exits 0')"
 assert "SOUL.md has SCOPE defined"             "$(has_content "$THANOS_DIR/SOUL.md" 'Out of scope')"
 assert "SOUL.md has ACTIVE status"             "$(has_content "$THANOS_DIR/SOUL.md" 'STATUS: ACTIVE')"
+
+# ================================================================
+# v3 \u2014 CAPABILITY SOCKET (MOBILIZE) TESTS
+# ================================================================
+
+# ----------------------------------------------------------------
+# GROUP 11: Injection hook \u2014 MOBILIZE concatenates the chosen skill
+# ----------------------------------------------------------------
+echo -e "\n${CYAN}[ GROUP 11 ] Capability Socket -- Injection Hook${RESET}"
+MOB_PROJ="$TEST_DIR/mob_proj"
+mkdir -p "$MOB_PROJ"; ( cd "$MOB_PROJ" && echo '{"name":"mob"}' > package.json )
+# Guard: if setup failed, fail loudly rather than letting downstream cd-failures
+# make the invalid-id exit-code assert pass for the wrong reason.
+assert "MOBILIZE test project was created" "$([[ -d "$MOB_PROJ" ]] && echo true || echo false)"
+MOB_RC=0
+( cd "$MOB_PROJ" && bash "$SKILL_ROOT/thanos.sh" --mobilize "visual-proof" >/dev/null 2>&1 </dev/null ) || MOB_RC=$?
+assert "MOBILIZE happy-path (visual-proof) exits 0"     "$([[ $MOB_RC -eq 0 ]] && echo true || echo false)"
+MOB_FILE="$MOB_PROJ/.thanos/MOBILIZED.md"
+assert "MOBILIZE builds .thanos/MOBILIZED.md"            "$(has_file "$MOB_FILE")"
+assert "injection hook: MOBILIZED.md has visual-proof skill header" "$(has_content "$MOB_FILE" 'SKILL: visual-proof')"
+assert "injection hook: visual-proof BODY content injected"          "$(has_content "$MOB_FILE" 'not proof')"
+assert "MOBILIZE records chosen skill"                   "$(has_content "$MOB_FILE" 'Mobilized skills: visual-proof')"
+
+# Invalid explicit id must NOT silently succeed (exit-code contract)
+INVALID_RC=0
+( cd "$MOB_PROJ" && bash "$SKILL_ROOT/thanos.sh" --mobilize "no-such-skill" >/dev/null 2>&1 </dev/null ) || INVALID_RC=$?
+assert "MOBILIZE returns non-zero for an invalid explicit skill id" "$([[ $INVALID_RC -ne 0 ]] && echo true || echo false)"
+
+# ----------------------------------------------------------------
+# GROUP 8: Detect-gate contract (blocking, not silent)
+# ----------------------------------------------------------------
+echo -e "\n${CYAN}[ GROUP 12 ] Tool Adapters -- Detect Gate${RESET}"
+
+# notes: zero-dependency, must always be ready (exit 0)
+NOTES_RC=0; bash "$SKILL_ROOT/tools/notes.sh" --detect >/dev/null 2>&1 </dev/null || NOTES_RC=$?
+assert "notes.sh --detect ready (exit 0)"               "$([[ $NOTES_RC -eq 0 ]] && echo true || echo false)"
+
+# email: force the "absent" scenario with a stripped PATH so the test is deterministic
+# whether or not react-email happens to be installed on the host.
+EMAIL_ERR=$(PATH="/usr/bin:/bin" bash "$SKILL_ROOT/tools/email.sh" --detect 2>&1 >/dev/null </dev/null) || true
+EMAIL_RC=0; PATH="/usr/bin:/bin" bash "$SKILL_ROOT/tools/email.sh" --detect >/dev/null 2>&1 </dev/null || EMAIL_RC=$?
+assert "email.sh --detect blocks when react-email absent (non-zero)" "$([[ $EMAIL_RC -ne 0 ]] && echo true || echo false)"
+assert "email.sh --detect emits an install hint"        "$(echo "$EMAIL_ERR" | grep -qi 'install' && echo true || echo false)"
+
+# screenshot: with Playwright hidden from PATH, must block + emit a hint (the plan's gate)
+SHOT_ERR=$(PATH="/usr/bin:/bin" bash "$SKILL_ROOT/tools/screenshot.sh" --detect 2>&1 >/dev/null </dev/null) || true
+SHOT_RC=0; PATH="/usr/bin:/bin" bash "$SKILL_ROOT/tools/screenshot.sh" --detect >/dev/null 2>&1 </dev/null || SHOT_RC=$?
+assert "screenshot.sh --detect blocks when Playwright absent (non-zero)" "$([[ $SHOT_RC -ne 0 ]] && echo true || echo false)"
+assert "screenshot.sh --detect emits an install hint"   "$(echo "$SHOT_ERR" | grep -qi 'install\|playwright' && echo true || echo false)"
+
+# ----------------------------------------------------------------
+# GROUP 9: Screenshot smoke (guarded \u2014 needs Playwright + python3)
+# ----------------------------------------------------------------
+echo -e "\n${CYAN}[ GROUP 13 ] Screenshot Smoke (served, not file://)${RESET}"
+if bash "$SKILL_ROOT/tools/screenshot.sh" --detect >/dev/null 2>&1 </dev/null; then
+  SHOT_DIR="$TEST_DIR/shot"; mkdir -p "$SHOT_DIR"
+  cat > "$SHOT_DIR/index.html" <<'HTML'
+<!doctype html><html><head><meta charset="utf-8"><title>t</title></head>
+<body style="margin:0;background:#6366f1;color:#fff;font:48px system-ui;display:flex;align-items:center;justify-content:center;height:100vh">OK</body></html>
+HTML
+  bash "$SKILL_ROOT/tools/screenshot.sh" "$SHOT_DIR/index.html" "$SHOT_DIR/out.png" 800 600 >/dev/null 2>&1 </dev/null || true
+  assert "screenshot.sh produces a non-empty PNG from a served page" "$(has_file "$SHOT_DIR/out.png")"
+  assert "captured file is a real PNG" "$(file "$SHOT_DIR/out.png" 2>/dev/null | grep -qi 'PNG image' && echo true || echo false)"
+else
+  echo -e "${YELLOW}[skip]${RESET} Playwright not installed \u2014 screenshot smoke skipped (detect-gate covers absence)"
+fi
+
+# ----------------------------------------------------------------
+# GROUP 10: Visual-rubric differential property (deterministic)
+# The redefined MIND Visual rubric must forbid "PNG exists -> high score".
+# (The real LLM differential is the opt-in tests/rubric_differential.sh.)
+# ----------------------------------------------------------------
+echo -e "\n${CYAN}[ GROUP 14 ] Redefined Visual Rubric${RESET}"
+GA="$SKILL_ROOT/GAUNTLET.md"
+assert "rubric: no-PNG UI change is blocking (score 0)"  "$(grep -q 'NO visual proof' "$GA" && echo true || echo false)"
+assert "rubric: bare PNG existence is capped low (<=30)" "$(grep -q 'caps here' "$GA" && echo true || echo false)"
+assert "rubric: forbids raising score just because a PNG exists" "$(grep -q 'may NOT raise this score just because a PNG exists' "$GA" && echo true || echo false)"
+assert "rubric: high score requires evidence-based justification" "$(grep -q 'evidence-based justification' "$GA" && echo true || echo false)"
 
 # ----------------------------------------------------------------
 # RESULTS

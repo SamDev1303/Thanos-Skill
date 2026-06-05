@@ -1,0 +1,9 @@
+# Thanos runtime state (created when thanos runs INSIDE a project, incl. this repo)
+.thanos/
+
+# Node / tooling
+node_modules/
+*.log
+
+# OS noise
+.DS_Store

@@ -13,5 +13,8 @@
 ## KEY CODE SECTIONS
 <!-- Main agent pastes relevant code snippets for context -->
 
+## MOBILIZED CAPABILITIES
+<!-- Capability skills active for this goal + any tool artifacts in .thanos/proof/ -->
+
 ## DIFF SUMMARY
 <!-- What changed since last loop -->

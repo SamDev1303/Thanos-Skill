@@ -117,6 +117,12 @@ Thanos tracks all state in six persistent Markdown files inside `.thanos/`. Thes
   └────────────────────────────────────────────────────────────┘
                               │
   ┌────────────────────────────────────────────────────────────┐
+  │ 3.5 MOBILIZE 🧤 Architect SEMANTICALLY sockets capability   │
+  │            skills for the goal → .thanos/MOBILIZED.md       │
+  │            Missing tools BLOCK (install-or-skip), not skip. │
+  └────────────────────────────────────────────────────────────┘
+                              │
+  ┌────────────────────────────────────────────────────────────┐
   │ 4. EXECUTE  ⚔️ Sub agent builds. ONE action at a time.       │
   └────────────────────────────────────────────────────────────┘
                               │
@@ -219,22 +225,59 @@ These commands can be used inside any running agent session:
 
 ---
 
+## 🧤 Capabilities — the Gauntlet Socket (v3)
+
+Thanos stays the **engine**. Drop-in **capabilities** socket into the Gauntlet for whatever you're
+building — **no 7th Infinity Stone**, the canon stays intact.
+
+- **`skills/<id>/SKILL.md`** — original, license-safe best-practice guidance (no upstream IP).
+- **`tools/<id>.sh`** — thin adapters that **`--detect`** then invoke a CLI you install **separately**
+  (zero license entanglement). Artifacts land in `.thanos/proof/`.
+- **`capabilities/manifest.json`** — the **catalog** the Architect reads to choose skills
+  **semantically** (judgment, not keyword routing). Nothing fits → vanilla Thanos.
+
+During **MOBILIZE**, the chosen skills are concatenated into `.thanos/MOBILIZED.md` and injected into
+the agent's context (the injection hook). Each skill's required tools are **detect-gated** — a missing
+tool is a **blocking** dependency written to `SPACE.md` (install-or-skip), never a silent skip.
+
+| Skill | Purpose | Tool(s) | Engine |
+|-------|---------|---------|--------|
+| `visual-proof` | Real screenshots so UI work has objective proof | `screenshot` | Playwright + python http |
+| `design` | Anti-AI-slop craft: hierarchy, spacing, taste | `screenshot` | Playwright + python http |
+| `context-graph` | Cheaper/richer REALITY via a code structure map | `graph` | python3 + git |
+| `media-comms` | Transcripts, video, email, durable notes | `transcribe` `video` `email` `notes` | Whisper · ffmpeg · react-email · markdown |
+
+```bash
+thanos --capabilities              # list installed skills + catalog
+thanos --detect screenshot         # detect-gate a tool (exit 0 = ready, non-zero = blocked + hint)
+thanos --mobilize "visual-proof"   # socket skills for the goal → .thanos/MOBILIZED.md
+```
+
+> Capabilities are **inspired by** the "Tools to build apps" projects — original guidance only, never
+> vendored source. See [`docs/CREDITS.md`](docs/CREDITS.md). GPL / non-standard-licensed projects are
+> adapter-invoke only. Thanos stays MIT.
+
+---
+
 ## 💥 CLI Reference
 
 ```bash
-thanos                              # auto-detect CLI, run discuss, launch
+thanos                              # auto-detect CLI, run discuss, mobilize, launch
 thanos claude                       # Claude Code
-thanos claude "build a REST API"    # Claude with inline goal (skips discuss)
+thanos claude "build a landing page"# Claude with inline goal (skips discuss)
 thanos codex                        # OpenAI Codex CLI
 thanos codex "fix the auth module" 
 thanos gemini                       # Gemini CLI
 thanos aider                        # Aider
 thanos --discuss                    # Run Q&A goal clarification only
+thanos --mobilize "ids"             # Socket capability skills for the goal
+thanos --detect <tool>              # Detect-gate a tool adapter (0 = ready)
+thanos --capabilities               # List installed capabilities + catalog
 thanos --status                     # Print all six stones
 thanos --reset                      # Wipe .thanos/ and start fresh
 thanos --resume                     # Resume from last checkpoint
 thanos --test                       # Run E2E test suite
-thanos --version                    # v2.0.0
+thanos --version                    # v3.0.0
 thanos --help                       # Full usage
 ```
 
@@ -249,9 +292,15 @@ All six scores must reach **≥ 95** before Thanos snaps. This is not negotiable
 | Logic Correctness | 20% | Does it actually do what was asked? |
 | Code Quality | 20% | DRY, patterns, no anti-patterns, readability |
 | Test Coverage | 20% | Edge cases covered, tests are meaningful |
-| Visual/UI Proof | 20% | Screenshot/DOM snapshot required for UI changes |
+| Visual/UI Proof | 20% | Real screenshot required — and the score measures *justification*, not mere existence (see below) |
 | Security | 10% | OWASP Top 10, no secrets, no injection |
 | Performance | 10% | No N+1, no blocking I/O, no memory leaks |
+
+**v3 — the Visual rubric is redefined.** A screenshot is the *evidence*, not the score. A bare PNG
+caps at **≤ 30** ("proof exists, unjudged"); reaching **≥ 95** requires the critic to justify, from the
+actual image, *why* the design works (hierarchy, spacing, contrast, alignment). You may **not** raise
+the score just because a PNG exists. (`tools/screenshot.sh` produces the proof; `GAUNTLET.md` holds the
+full rubric.)
 
 The critic runs **cold** — no previous loop context. It reads only the current repository state. This is the Ralph Loop’s most important rule: **never let the agent grade its own work from memory.**
 
@@ -294,13 +343,16 @@ Hermes is an agent architecture built for self-improvement. It finds bad pattern
 Thanos-Skill/
 ├── thanos.sh          ← Main CLI harness (this is what you run)
 ├── THANOS.md          ← Agent skill file (embedded into agent context)
-├── GAUNTLET.md        ← Deep architecture + philosophy reference
+├── GAUNTLET.md        ← Deep architecture + the socket + redefined Visual rubric
 ├── SKILL.md           ← Agent loader frontmatter
-├── install.sh         ← One-line global install
+├── install.sh         ← One-line global install (stages the socket too)
 ├── package.json       ← npx thanos-skill support
+├── skills/            ← v3 capability guidance (visual-proof, design, context-graph, media-comms)
+├── tools/             ← v3 tool adapters (--detect + invoke) + registry.json
+├── capabilities/      ← manifest.json — the catalog the Architect reads
 ├── templates/         ← Stone file templates
-├── tests/             ← E2E test suite
-└── docs/              ← Architecture diagrams
+├── tests/             ← E2E test suite (+ opt-in rubric_differential.sh)
+└── docs/              ← Architecture diagrams + CREDITS.md
 ```
 
 ---
