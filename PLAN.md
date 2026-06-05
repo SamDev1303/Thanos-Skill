@@ -13,7 +13,7 @@
 | **P2** | Engine — MOBILIZE in `thanos.sh`, `THANOS.md`, `GAUNTLET.md`, `SKILL.md`, templates, install | ✅ **done** | `7802a57`, `03a0796` |
 | **P3** | PROOF gate — `visual-proof` skill + `screenshot.sh` + `manifest.json`, wired e2e | ✅ **mechanical gate passed** (LLM E2E + rubric differential → P5) | _next commit_ |
 | **P4** | Remaining bundles — `design`, `context-graph`, `media-comms` + 5 tool adapters | ✅ **done** (video/notes/graph real artifacts; email blocked-path; transcribe detect) | _next commit_ |
-| **P5** | Tests & docs — extend `tests/`, rewrite README, `--test` green | ⬜ pending | — |
+| **P5** | Tests & docs — extend `tests/`, rewrite README, `--test` green | ✅ **done** (e2e 49/49, internal 26/0; README capabilities section) | _next commit_ |
 | **P6** | Re-review — Gemini + Haiku on built code; apply blocking fixes | ⬜ pending | — |
 | **P7** | Ship — push branch + PR, delete accidental fork, remove old local dir | ⬜ pending | — |
 
@@ -28,8 +28,9 @@
 | Detect gate: `screenshot.sh --detect` non-zero+hint when Playwright absent, 0 when present | ✅ both directions |
 | Screenshot: served `index.html` → non-empty PNG | ✅ 239KB 1024×640 PNG, http not file:// |
 | Blocking gate: blocked dep → SPACE.md + MOBILIZED.md (not silent) | ✅ recorded both places |
-| Visual rubric differential: lower score without PNG vs. with good PNG | ⬜ P5 (real headless critic) |
-| E2E: `thanos claude "build a landing page"` → visual-proof mobilizes, PNG in `.thanos/proof/` | ⬜ P5 (manual/headless) |
+| Visual rubric differential: lower score without PNG vs. with good PNG | ⚠️ deterministic rubric-property tests ✅ (GROUP 14); real-LLM `tests/rubric_differential.sh` **blocked on API credits** ("Credit balance is too low") — run when funded |
+| E2E: `thanos claude "build a landing page"` → visual-proof mobilizes, PNG in `.thanos/proof/` | ⚠️ mechanical path fully proven (mobilize+inject+screenshot+score wiring); full interactive run blocked on same API credits |
+| Standalone `tests/e2e_test.sh` (CI suite) | ✅ 49/49 (47/47 on CI where Playwright absent → smoke self-skips) |
 | Re-review blocking findings fixed | ⬜ P6 |
 
 ### Environment facts (verified this session)
