@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Tool adapters. Each entry: detect (the --detect command), install_hint (what to run if missing), invoke (usage). Adapters are thin wrappers around a CLI the user installs SEPARATELY — zero license entanglement. Added per-tool as each capability bundle lands.",
+  "description": "Tool adapters. Each entry: detect (the --detect command), install_hint (what to run if missing), invoke (usage). Adapters are thin wrappers around a CLI the user installs SEPARATELY — zero license entanglement.",
   "tools": {
     "screenshot": {
       "detect": "tools/screenshot.sh --detect",
@@ -8,6 +8,41 @@
       "invoke": "tools/screenshot.sh <url-or-local-path> [out.png] [width] [height]",
       "artifacts": ".thanos/proof/*.png",
       "engine": "playwright (browser) + python3 (ephemeral static server for local files)"
+    },
+    "video": {
+      "detect": "tools/video.sh --detect",
+      "install_hint": "brew install ffmpeg   (or: apt-get install ffmpeg)",
+      "invoke": "tools/video.sh testcard [out.mp4] [secs] | tools/video.sh slideshow <img-dir> [out.mp4] [sec/img]",
+      "artifacts": ".thanos/proof/video-*.mp4",
+      "engine": "ffmpeg"
+    },
+    "transcribe": {
+      "detect": "tools/transcribe.sh --detect",
+      "install_hint": "pipx install openai-whisper   (or: pip install -U openai-whisper) — also needs ffmpeg",
+      "invoke": "tools/transcribe.sh <audio-file> [out.txt] [model]",
+      "artifacts": ".thanos/proof/transcript-*.txt",
+      "engine": "OpenAI Whisper + ffmpeg"
+    },
+    "email": {
+      "detect": "tools/email.sh --detect",
+      "install_hint": "npm i -D react-email @react-email/components",
+      "invoke": "tools/email.sh export <email-dir> [out-dir]",
+      "artifacts": ".thanos/proof/email/*.html",
+      "engine": "react-email (render only — sending is outward-facing, confirm first)"
+    },
+    "notes": {
+      "detect": "tools/notes.sh --detect",
+      "install_hint": "none — zero-dependency markdown. Optionally set THANOS_NOTES_VAULT to an Obsidian vault / memos dir.",
+      "invoke": "tools/notes.sh <title> [body...]",
+      "artifacts": "$THANOS_NOTES_VAULT or .thanos/proof/notes/*.md",
+      "engine": "zero-dep markdown (Obsidian/memos compatible)"
+    },
+    "graph": {
+      "detect": "tools/graph.sh --detect",
+      "install_hint": "none — uses python3 (+ git if present)",
+      "invoke": "tools/graph.sh [out-prefix]",
+      "artifacts": ".thanos/proof/context-graph.json + .md",
+      "engine": "python3 + git"
     }
   }
 }

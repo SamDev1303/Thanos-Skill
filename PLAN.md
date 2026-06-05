@@ -12,7 +12,7 @@
 | **P1** | Bootstrap — scaffold `skills/ tools/ capabilities/ docs/CREDITS.md` + LICENSE | ✅ **done** | `2a059f9` |
 | **P2** | Engine — MOBILIZE in `thanos.sh`, `THANOS.md`, `GAUNTLET.md`, `SKILL.md`, templates, install | ✅ **done** | `7802a57`, `03a0796` |
 | **P3** | PROOF gate — `visual-proof` skill + `screenshot.sh` + `manifest.json`, wired e2e | ✅ **mechanical gate passed** (LLM E2E + rubric differential → P5) | _next commit_ |
-| **P4** | Remaining bundles — `design`, `context-graph`, `media-comms` + tools | ⬜ pending | — |
+| **P4** | Remaining bundles — `design`, `context-graph`, `media-comms` + 5 tool adapters | ✅ **done** (video/notes/graph real artifacts; email blocked-path; transcribe detect) | _next commit_ |
 | **P5** | Tests & docs — extend `tests/`, rewrite README, `--test` green | ⬜ pending | — |
 | **P6** | Re-review — Gemini + Haiku on built code; apply blocking fixes | ⬜ pending | — |
 | **P7** | Ship — push branch + PR, delete accidental fork, remove old local dir | ⬜ pending | — |
